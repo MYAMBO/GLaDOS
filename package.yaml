@@ -1,0 +1,34 @@
+name: GLaDOS
+version: "0.1.0.0"
+build-type: Simple
+
+dependencies:
+  - base >= 4.7 && < 5
+  - containers
+  - optparse-applicative
+
+library:
+  source-dirs:
+    - Parsing
+  exposed-modules:
+    - Parsing
+  ghc-options: [-Wall, -Wextra]
+
+executables:
+  GLaDOS:
+    main: Main.hs
+    source-dirs:
+      - src
+    dependencies:
+      - GLaDOS
+    ghc-options: [-Wall, -Wextra]
+
+tests:
+  GLaDOS-test:
+    main: Test.hs
+    source-dirs: test
+    dependencies:
+      - GLaDOS
+      - silently
+      - hspec
+    ghc-options: [-threaded, -fhpc]
