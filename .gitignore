@@ -1,0 +1,9 @@
+GLaDOS
+.stack-work
+.hpc
+dist-newstyle
+*.cabal
+*.o
+*.hi
+*.lock
+log.txt
