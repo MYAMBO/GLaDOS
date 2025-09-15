@@ -5,7 +5,6 @@ build-type: Simple
 dependencies:
   - base >= 4.7 && < 5
   - containers
-  - optparse-applicative
 
 library:
   source-dirs:
