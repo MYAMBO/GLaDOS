@@ -7,3 +7,4 @@ dist-newstyle
 *.hi
 *.lock
 log.txt
+coverage
