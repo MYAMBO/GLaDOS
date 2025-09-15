@@ -1,6 +1,6 @@
 # Documentation du module ErrorMonad
 
-Ce document décrit le fonctionnement du module `ErrorMonad`, qui fournit une gestion simple et expressive des erreurs en Haskell sans dépendances externes, en s’appuyant sur `Either`.
+Ce document décrit le fonctionnement du module `ErrorHandling`, qui fournit une gestion simple et expressive des erreurs en Haskell sans dépendances externes, en s’appuyant sur `Either`.
 
 ---
 

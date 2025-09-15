@@ -9,8 +9,10 @@ dependencies:
 library:
   source-dirs:
     - Parsing
+    - ErrorHandling
   exposed-modules:
     - Parsing
+    - ErrorHandling
   ghc-options: [-Wall, -Wextra]
 
 executables:

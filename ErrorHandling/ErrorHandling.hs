@@ -5,11 +5,7 @@
 -- ErrorHandling
 -}
 
-module ErrorMonad (
-    Err,
-    throw,
-    runErr
-) where
+module ErrorHandling (Err, throw, runErr) where
 
 type Err a = Either String a
 
