@@ -1,4 +1,4 @@
-GLaDOS
+GLaDOS*
 .stack-work
 .hpc
 dist-newstyle
@@ -7,3 +7,5 @@ dist-newstyle
 *.hi
 *.lock
 log.txt
+hpc*
+coverage.tix
