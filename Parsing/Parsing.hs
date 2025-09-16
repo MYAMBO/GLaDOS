@@ -40,7 +40,7 @@ pureFunc :: a -> String -> Maybe (a, String)
 pureFunc a str = Just (a, str)
 
 pureParser :: a -> Parser a
-pureParser a = Parser(pureFunc a)
+pureParser a = Parser (pureFunc a)
 
 appfunc :: ParserType (a -> b) -> ParserType a -> ParserType b
 appfunc p1 p2 a | Just (f, b) <- p1 a, Just (d, c) <- p2 b = Just (f d, c)
@@ -124,8 +124,7 @@ parseInt = do
     digits <- parseUInt
     return (-digits)
     <|> do
-    digits <- parseUInt
-    return digits
+    parseUInt
 
 parseTuple :: Parser a -> Parser (a, a)
 parseTuple p = do
