@@ -14,7 +14,8 @@ import Tools
 
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
-    (evalMore env s args) <|> (evalLess env s args) <|> (evalMultiply env s args)
+    (evalMore env s args)       <|>     (evalLess env s args)   <|>
+    (evalMultiply env s args)   <|>     (evalDivide env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args=
@@ -43,6 +44,15 @@ evalMultiply env "*" args = do
             Just n
 evalMultiply _ _ _ = Nothing
 
+evalDivide :: Env -> String -> [Ast] -> Maybe Ast
+evalDivide _ _ args | length args < 2 = Nothing
+evalDivide env "div" args =
+    fmap (Atome . foldl1 safeDiv) (traverse (evalInt env) args)
+  where
+    evalInt e ast = do
+        (Atome n, _) <- eval e ast
+        Just n
+evalDivide _ _ _ = Nothing
 
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
@@ -80,3 +90,9 @@ example2 = Liste [Symbole "-", Symbole "hello", Atome 2, Atome 3]
 
 example3 :: Ast
 example3 = Liste [Symbole "*", Atome 2, Atome 4]
+
+example4 :: Ast
+example4 = Liste [Symbole "div", Atome 6, Atome 2]
+
+example5 :: Ast
+example5 = Liste [Symbole "div", Atome 6, Atome 0]
