@@ -7,45 +7,42 @@
 
 module Interpret where
 
+import Control.Applicative ((<|>))
 import Control.Monad (mapM)
 import DataStored
+import Tools
 
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
-evalSymbols env "*" args = evalMultiply env "*" args
-evalSymbols env "+" args = evalMore env "+" args
-evalSymbols env "-" args = evalLess env "-" args
+evalSymbols env s args = 
+    (evalMore env s args) <|> (evalLess env s args) <|> (evalMultiply env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
-evalMore env "+" args = do
-    vals <- mapM (fmap fst . eval env) args
-    nums <- mapM getInt vals
-    Just (Atome (sum nums))
+evalMore env "+" args=
+    fmap (Atome . sum) (traverse (evalInt env) args)
     where
-    getInt (Atome n) = Just n
-    getInt _ = Nothing
+        evalInt e ast = do
+            (Atome n, _) <- eval e ast
+            Just n
 evalMore _ _ _ = Nothing
 
 evalLess :: Env -> String -> [Ast] -> Maybe Ast
 evalLess env "-" args = do
-    vals <- mapM (fmap fst . eval env) args
-    nums <- mapM getInt vals
-    case nums of
-        (x:xs) -> Just (Atome (foldl (-) x xs))
-        []     -> Just (Atome 0)
+    fmap (Atome . foldl1 (-)) (traverse (evalInt env) args)
     where
-    getInt (Atome n) = Just n
-    getInt _ = Nothing
+        evalInt e ast = do
+            (Atome n, _) <- eval e ast
+            Just n
 evalLess _ _ _ = Nothing
 
 evalMultiply :: Env -> String -> [Ast] -> Maybe Ast
 evalMultiply env "*" args = do
-    vals <- mapM (fmap fst . eval env) args
-    nums <- mapM getInt vals
-    Just (Atome (product nums))
+    fmap (Atome . product) (traverse (evalInt env) args)
     where
-    getInt (Atome n) = Just n
-    getInt _ = Nothing
+        evalInt e ast = do
+            (Atome n, _) <- eval e ast
+            Just n
 evalMultiply _ _ _ = Nothing
+
 
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
