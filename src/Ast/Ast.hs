@@ -65,12 +65,12 @@ sexprToIf :: SExpr -> Maybe Ast
 sexprToIf (SList[SSymbol "if", cond, expr1, expr2]) = do
     condAst <- sexprToAST cond
     expr1Ast <- sexprToAST expr1
-    expr2Ast <- sexprToAST  expr2
+    expr2Ast <- sexprToAST expr2
     Just $ If condAst expr1Ast expr2Ast
 sexprToIf _ = Nothing
 
 sexprToLambda :: SExpr -> Maybe Ast
-sexprToLambda  (SList[SSymbol "lambda", SList args, body]) = do
+sexprToLambda (SList[SSymbol "lambda", SList args, body]) = do
     argsList <- getSymbols args
     bodyAst <- sexprToAST body
     Just $ Lambda argsList bodyAst
@@ -84,4 +84,11 @@ sexprToCall (SList (callee : args)) = do
 sexprToCall _ = Nothing
 
 sexprToAST :: SExpr -> Maybe Ast
-sexprToAST x = (sexprToAtom x) <|> (sexprToBool x) <|> (sexprToSymbol x) <|> (sexprToLambda x) <|> (sexprToIf x) <|> (sexprToDefine x) <|> (sexprToCall x)
+sexprToAST x =
+    (sexprToAtom x)
+    <|> (sexprToBool x)
+    <|> (sexprToSymbol x)
+    <|> (sexprToLambda x)
+    <|> (sexprToIf x)
+    <|> (sexprToDefine x)
+    <|> (sexprToCall x)
