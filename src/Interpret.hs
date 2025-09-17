@@ -54,6 +54,16 @@ evalDivide env "div" args =
         Just n
 evalDivide _ _ _ = Nothing
 
+evalModulo :: Env -> String -> [Ast] -> Maybe Ast
+evalModulo _ _ args | length args < 2 = Nothing
+evalModulo env "div" args =
+    fmap (Atome . foldl1 safeMod) (traverse (evalInt env) args)
+  where
+    evalInt e ast = do
+        (Atome n, _) <- eval e ast
+        Just n
+evalModulo _ _ _ = Nothing
+
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
 evalAtom env (Symbole s) = lookupVar s env
@@ -96,3 +106,9 @@ example4 = Liste [Symbole "div", Atome 6, Atome 2]
 
 example5 :: Ast
 example5 = Liste [Symbole "div", Atome 6, Atome 0]
+
+example6 :: Ast
+example6 = Liste [Symbole "mod", Atome 10, Atome 4]
+
+example7 :: Ast
+example7 = Liste [Symbole "mod", Atome 10, Atome 0]
