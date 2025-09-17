@@ -47,6 +47,13 @@ evalMultiply env "*" args = do
     getInt _ = Nothing
 evalMultiply _ _ _ = Nothing
 
+evalEquality :: Env -> String -> [Ast] -> Maybe Ast
+evalEquality env "eq?" [a, b] = do
+    if a == b
+        then Just(Ast #t)
+        else Just(Ast #f)
+evalEquality _ _ _ = Nothing
+
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
 evalAtom env (Symbole s) = lookupVar s env
