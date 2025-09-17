@@ -45,7 +45,7 @@ evalMultiply env "*" args = do
 evalMultiply _ _ _ = Nothing
 
 evalDivide :: Env -> String -> [Ast] -> Maybe Ast
-evalDivide env "/" args =
+evalDivide env "div" args =
     fmap (Atome . foldl1 safeDiv) (traverse (evalInt env) args)
   where
     evalInt e ast = do
@@ -94,4 +94,4 @@ example4 :: Ast
 example4 = Liste [Symbole "/", Atome 6, Atome 2]
 
 example5 :: Ast
-example5 = Liste [Symbole "/", Atome 6, Atome 0]
+example5 = Liste [Symbole "div", Atome 6, Atome 0]
