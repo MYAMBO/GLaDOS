@@ -15,6 +15,7 @@ data Ast =
     deriving (Show)
 
 type Env = [(String, Ast)]
+type AstResult = (Ast, Env)
 
 lookupVar :: String -> Env -> Maybe Ast
 lookupVar _ [] = Nothing
