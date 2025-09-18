@@ -25,7 +25,7 @@ evalMore env "+" args=
         evalInt e ast = do
             (Atome n, _) <- eval e ast
             Just n
-evalMore _ "+" _ = Nothing
+evalMore _ _ _ = Nothing
 
 evalLess :: Env -> String -> [Ast] -> Maybe Ast
 evalLess env "-" args = do
@@ -34,7 +34,7 @@ evalLess env "-" args = do
         evalInt e ast = do
             (Atome n, _) <- eval e ast
             Just n
-evalLess _ "-" _ = Nothing
+evalLess _ _ _ = Nothing
 
 evalMultiply :: Env -> String -> [Ast] -> Maybe Ast
 evalMultiply env "*" args = do
@@ -43,10 +43,10 @@ evalMultiply env "*" args = do
         evalInt e ast = do
             (Atome n, _) <- eval e ast
             Just n
-evalMultiply _ "*" _ = Nothing
+evalMultiply _ _ _ = Nothing
 
 evalDivide :: Env -> String -> [Ast] -> Maybe Ast
-evalDivide _ "div" args | length args < 2 = Nothing
+evalDivide _ _ args | length args < 2 = Nothing
 evalDivide env "div" args =
     fmap (Atome . foldl1 safeDiv) (traverse (evalInt env) args)
   where
@@ -56,7 +56,7 @@ evalDivide env "div" args =
 evalDivide _ _ _ = Nothing
 
 evalModulo :: Env -> String -> [Ast] -> Maybe Ast
-evalModulo _ "mod" args | length args < 2 = Nothing
+evalModulo _ _ args | length args < 2 = Nothing
 evalModulo env "mod" args =
     fmap (Atome . foldl1 safeMod) (traverse (evalInt env) args)
   where
@@ -67,7 +67,6 @@ evalModulo _ _ _ = Nothing
 
 evalGreater :: Env -> String -> [Ast] -> Maybe Ast
 evalGreater _ _ args | length args == 0 = Nothing
-evalGreater _ _ | length args == 1 = Just(Ast #t)
 
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
