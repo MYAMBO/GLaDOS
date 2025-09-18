@@ -16,7 +16,8 @@ evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
     (evalMore env s args)       <|>     (evalLess env s args)   <|>
     (evalMultiply env s args)   <|>     (evalDivide env s args) <|>
-    (evalModulo env s args)
+    (evalModulo env s args)     <|>     (evalGreater env s args)<|>
+    (evalSmaller env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args=
@@ -69,11 +70,13 @@ evalGreater :: Env -> String -> [Ast] -> Maybe Ast
 evalGreater _ _ args | length args == 0 = Nothing
 evalGreater env ">" args =
     and [x > y | (x, y) <- zip args (tail args)]
+evalGreater _ _ _ = Nothing
 
 evalSmaller :: Env -> String -> [Ast] -> Maybe Ast
 evalSmaller _ _ args | length args == 0 = Nothing
 evalSmaller env ">" args =
     and [x < y | (x, y) <- zip args (tail args)]
+evalSmaller _ _ _ = Nothing
 
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
