@@ -15,7 +15,8 @@ import Tools
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
     (evalMore env s args)       <|>     (evalLess env s args)   <|>
-    (evalMultiply env s args)   <|>     (evalDivide env s args)
+    (evalMultiply env s args)   <|>     (evalDivide env s args) <|>
+    (evalModulo env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args=
