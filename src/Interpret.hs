@@ -67,6 +67,13 @@ evalModulo _ _ _ = Nothing
 
 evalGreater :: Env -> String -> [Ast] -> Maybe Ast
 evalGreater _ _ args | length args == 0 = Nothing
+evalGreater env ">" args =
+    and [x > y | (x, y) <- zip args (tail args)]
+
+evalSmaller :: Env -> String -> [Ast] -> Maybe Ast
+evalSmaller _ _ args | length args == 0 = Nothing
+evalSmaller env ">" args =
+    and [x < y | (x, y) <- zip args (tail args)]
 
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
