@@ -65,6 +65,13 @@ evalModulo env "div" args =
         Just n
 evalModulo _ _ _ = Nothing
 
+--evalEquality :: Env -> String -> [Ast] -> Maybe Ast
+--evalEquality env "eq?" [a, b] = do
+--    if (eval a) === (eval b)
+--        then Just(Ast True)
+--        else Just(Ast False)
+--evalEquality _ _ _ = Nothing
+
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
 evalAtom env (Symbole s) = lookupVar s env
@@ -113,3 +120,9 @@ example6 = Liste [Symbole "mod", Atome 10, Atome 4]
 
 example7 :: Ast
 example7 = Liste [Symbole "mod", Atome 10, Atome 0]
+
+example12 :: Ast
+example12 = Liste [Symbole "eq?", Atome 00, Atome 0]
+
+example13 :: Ast
+example13 = Liste [Symbole "eq?", Atome 10, Atome 0]
