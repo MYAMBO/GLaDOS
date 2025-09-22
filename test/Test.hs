@@ -7,9 +7,9 @@
 
 import Test.Hspec
 import qualified TestParsing
-import qualified TestErrorHandling
+import qualified TestInterpret
 
 main :: IO ()
 main = hspec $ do
     TestParsing.spec
-    TestErrorHandling.spec
+    TestInterpret.spec
