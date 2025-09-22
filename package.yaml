@@ -27,7 +27,9 @@ executables:
 tests:
   GLaDOS-test:
     main: Test.hs
-    source-dirs: test
+    source-dirs:
+      - test
+      - src
     dependencies:
       - GLaDOS
       - silently
