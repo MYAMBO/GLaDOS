@@ -11,7 +11,7 @@ import DataStored
 
 evalInt :: String -> [Ast] -> Maybe Int
 evalInt _ [] = Just 0
-evalInt _ [Atome n] = Just n
+evalInt _ [Atom n] = Just n
 evalInt _ _ = Nothing
 
 safeDiv :: Int -> Int -> Int

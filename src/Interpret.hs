@@ -14,10 +14,10 @@ import Tools hiding (evalInt)
 
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
-    (evalMore env s args)       <|>     (evalLess env s args)   <|>
-    (evalMultiply env s args)   <|>     (evalDivide env s args) <|>
-    (evalModulo env s args)     <|>     (evalGreater env s args)<|>
-    (evalSmaller env s args)
+    (evalMore env s args)       <|>     (evalLess env s args)     <|>
+    (evalMultiply env s args)   <|>     (evalDivide env s args)   <|>
+    (evalModulo env s args)     <|>     (evalGreater env s args)  <|>
+    (evalSmaller env s args)    <|>     (evalEquality env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args=
@@ -58,7 +58,7 @@ evalDivide _ _ _ = Nothing
 
 evalModulo :: Env -> String -> [Ast] -> Maybe Ast
 evalModulo _ _ args | length args < 2 = Nothing
-evalModulo env "mod" args =
+evalModulo env "mod" args = 
     fmap (Atom . foldl1 safeMod) (traverse (evalInt env) args)
   where
     evalInt e ast = do
@@ -88,12 +88,19 @@ evalSmaller env "<" args = do
         Just n
 evalSmaller _ _ _ = Nothing
 
+evalEquality :: Env -> String -> [Ast] -> Maybe Ast
+evalEquality env "eq?" [a, b] = do
+    (va, _) <- eval env a
+    (vb, _) <- eval env b
+    Just (ABool (va == vb))
+evalEquality _ _ _ = Nothing
+
 evalAtom :: Env -> Ast -> Maybe AstResult
-evalAtom env (Atom n)     = Just (Atom n, env)
-evalAtom env (Symbol s)   = do
+evalAtom env (Atom n) = Just (Atom n, env)
+evalAtom env (Symbol s) = do
     v <- lookupVar s env
     Just (v, env)
-evalAtom _ _              = Nothing
+evalAtom _ _  = Nothing
 
 evalDefine :: Env -> String -> Ast -> Maybe AstResult
 evalDefine env var body =
@@ -108,17 +115,17 @@ evalList env (Symbol f : args) = do
 evalList _ _ = Nothing
 
 eval :: Env -> Ast -> Maybe AstResult
-eval env (Atom n)        = Just (Atom n, env)
-eval env (Symbol s)      = do
+eval env (Atom n) = Just (Atom n, env)
+eval env (Symbol s) = do
     v <- lookupVar s env
     Just (v, env)
-eval env (Define var b)  = evalDefine env var b
-eval env (List xs)       = evalList env xs
-eval env (ABool b)       = Just (ABool b, env)
-eval env (If cond t f)   = do
+eval env (Define var b) = evalDefine env var b
+eval env (List xs) = evalList env xs
+eval env (ABool b) = Just (ABool b, env)
+eval env (If cond t f) = do
     (ABool c, env1) <- eval env cond
     if c then eval env1 t else eval env1 f
-eval env (Call f args)   = Nothing
+eval env (Call f args) = Nothing
 eval env (Lambda p body) = Just (Lambda p body, env)
 
 
@@ -156,3 +163,8 @@ example10 = List [Symbol "<", Atom 0, Atom 4]
 example11 :: Ast
 example11 = List [Symbol "<", Atom 10, Atom 0]
 
+example12 :: Ast
+example12 = List [Symbol "eq?", Atom 0, Atom 0]
+
+example13 :: Ast
+example13 = List [Symbol "eq?", Atom 10, Atom 0]
