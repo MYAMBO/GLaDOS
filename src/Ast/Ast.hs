@@ -1,11 +1,18 @@
-module Ast where
+{-
+-- EPITECH PROJECT, 2025
+-- GLaDOS
+-- File description:
+-- Ast
+-}
+
+module Ast.Ast where
 
 import Control.Applicative
 
 data SExpr = SAtom Int
            | SSymbol String
            | SList [SExpr]
-           deriving Show
+           deriving (Show, Eq)
 
 data Ast = Atom Int
          | Symbol String
@@ -15,7 +22,7 @@ data Ast = Atom Int
          | If Ast Ast Ast
          | Call Ast [Ast]
          | Lambda [String] Ast
-         deriving Show
+         deriving (Show, Eq)
 
 getSymbol :: SExpr -> Maybe String
 getSymbol (SSymbol s) = Just s
