@@ -1,3 +1,10 @@
+{-
+-- EPITECH PROJECT, 2025
+-- GLaDOS
+-- File description:
+-- Ast
+-}
+
 module Ast.Ast where
 
 import Control.Applicative
@@ -6,7 +13,7 @@ import DataStored
 data SExpr = SAtom Int
            | SSymbol String
            | SList [SExpr]
-           deriving Show
+           deriving (Show, Eq)
 
 getSymbol :: SExpr -> Maybe String
 getSymbol (SSymbol s) = Just s
