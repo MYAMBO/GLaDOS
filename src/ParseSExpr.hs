@@ -8,13 +8,8 @@
 module ParseSExpr where
 
 import Parsing
+import Ast.Ast (SExpr(..))
 import Control.Applicative (Alternative(..))
-
-data SExpr =
-      Atom Int
-    | Symbol String
-    | List [SExpr]
-    deriving Show
 
 parseQuoted :: Parser String
 parseQuoted = do
@@ -28,12 +23,12 @@ parseUnquoted = parseAnyCharExcept " )"
 
 parseAtom :: Parser SExpr
 parseAtom =
-        (Atom <$> parseInt)
-    <|> (Symbol <$> parseQuoted)
-    <|> (Symbol <$> parseUnquoted)
+        (SAtom <$> parseInt)
+    <|> (SSymbol <$> parseQuoted)
+    <|> (SSymbol <$> parseUnquoted)
 
 parseElement :: Parser SExpr
-parseElement = (List <$> parseSExpr) <|> parseAtom
+parseElement = (SList <$> parseSExprNext) <|> parseAtom
 
 parseSExprList :: Parser [SExpr]
 parseSExprList = do
@@ -46,11 +41,14 @@ parseSExprList = do
     rest <- parseSExprList
     return (elt : rest)
 
-parseSExpr :: Parser [SExpr]
-parseSExpr = do
+parseSExprNext :: Parser [SExpr]
+parseSExprNext = do
     _ <- parseMany (parseAnyChar " \n\t")
     _ <- parseChar '('
     parseSExprList
+
+parseSExpr :: Parser [SExpr]
+parseSExpr = parseSExprNext
     <|> do
     _ <- parseMany (parseAnyChar " \n\t")
     res <- parseAtom
