@@ -8,21 +8,12 @@
 module Ast.Ast where
 
 import Control.Applicative
+import DataStored
 
 data SExpr = SAtom Int
            | SSymbol String
            | SList [SExpr]
            deriving (Show, Eq)
-
-data Ast = Atom Int
-         | Symbol String
-         | List [Ast]
-         | Define String Ast
-         | ABool Bool
-         | If Ast Ast Ast
-         | Call Ast [Ast]
-         | Lambda [String] Ast
-         deriving (Show, Eq)
 
 getSymbol :: SExpr -> Maybe String
 getSymbol (SSymbol s) = Just s
