@@ -14,9 +14,9 @@ import Tools
 
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
-    (evalMore env s args)       <|>     (evalLess env s args)   <|>
-    (evalMultiply env s args)   <|>     (evalDivide env s args) <|>
-    (evalModulo env s args)
+    (evalMore env s args)       <|>     (evalLess env s args)       <|>
+    (evalMultiply env s args)   <|>     (evalDivide env s args)     <|>
+    (evalModulo env s args)     <|>     (evalEquality env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args=
@@ -65,12 +65,12 @@ evalModulo env "div" args =
         Just n
 evalModulo _ _ _ = Nothing
 
---evalEquality :: Env -> String -> [Ast] -> Maybe Ast
---evalEquality env "eq?" [a, b] = do
---    if (eval a) === (eval b)
---        then Just(Ast True)
---        else Just(Ast False)
---evalEquality _ _ _ = Nothing
+evalEquality :: Env -> String -> [Ast] -> Maybe Ast
+evalEquality env "eq?" [a, b] = do
+    (va, _) <- eval env a
+    (vb, _) <- eval env b
+    Just (ABool (va == vb))
+evalEquality _ _ _ = Nothing
 
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
@@ -122,7 +122,7 @@ example7 :: Ast
 example7 = Liste [Symbole "mod", Atome 10, Atome 0]
 
 example12 :: Ast
-example12 = Liste [Symbole "eq?", Atome 00, Atome 0]
+example12 = List [Symbol "eq?", Atom 0, Atom 0]
 
 example13 :: Ast
-example13 = Liste [Symbole "eq?", Atome 10, Atome 0]
+example13 = List [Symbol "eq?", Atom 10, Atom 0]
