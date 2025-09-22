@@ -14,9 +14,10 @@ import Tools
 
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
-    (evalMore env s args)       <|>     (evalLess env s args)       <|>
-    (evalMultiply env s args)   <|>     (evalDivide env s args)     <|>
-    (evalModulo env s args)     <|>     (evalEquality env s args)
+    (evalMore env s args)       <|>     (evalLess env s args)     <|>
+    (evalMultiply env s args)   <|>     (evalDivide env s args)   <|>
+    (evalModulo env s args)     <|>     (evalGreater env s args)  <|>
+    (evalSmaller env s args)    <|>     (evalEquality env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args=
@@ -57,13 +58,35 @@ evalDivide _ _ _ = Nothing
 
 evalModulo :: Env -> String -> [Ast] -> Maybe Ast
 evalModulo _ _ args | length args < 2 = Nothing
-evalModulo env "div" args =
+evalModulo env "mod" args =
     fmap (Atome . foldl1 safeMod) (traverse (evalInt env) args)
   where
     evalInt e ast = do
         (Atome n, _) <- eval e ast
         Just n
 evalModulo _ _ _ = Nothing
+
+evalGreater :: Env -> String -> [Ast] -> Maybe Ast
+evalGreater _ _ args | null args = Nothing
+evalGreater env ">" args = do
+    list <- (traverse (evalInt env) args)
+    Just (Bool (and [x > y | (x, y) <- zip list (tail list)]))
+  where
+    evalInt e ast = do
+        (Atome n, _) <- eval e ast
+        Just n
+evalGreater _ _ _ = Nothing
+
+evalSmaller :: Env -> String -> [Ast] -> Maybe Ast
+evalSmaller _ _ args | null args = Nothing
+evalSmaller env "<" args = do
+    list <- (traverse (evalInt env) args)
+    Just (Bool (and [x > y | (x, y) <- zip list (tail list)]))
+  where
+    evalInt e ast = do
+        (Atome n, _) <- eval e ast
+        Just n
+evalSmaller _ _ _ = Nothing
 
 evalEquality :: Env -> String -> [Ast] -> Maybe Ast
 evalEquality env "eq?" [a, b] = do
@@ -120,6 +143,18 @@ example6 = Liste [Symbole "mod", Atome 10, Atome 4]
 
 example7 :: Ast
 example7 = Liste [Symbole "mod", Atome 10, Atome 0]
+
+example8 :: Ast
+example8 = Liste [Symbole ">", Atome 10, Atome 4]
+
+example9 :: Ast
+example9 = Liste [Symbole ">", Atome 0, Atome 10]
+
+example10 :: Ast
+example10 = Liste [Symbole "<", Atome 0, Atome 4]
+
+example11 :: Ast
+example11 = Liste [Symbole "<", Atome 10, Atome 0]
 
 example12 :: Ast
 example12 = List [Symbol "eq?", Atom 0, Atom 0]
