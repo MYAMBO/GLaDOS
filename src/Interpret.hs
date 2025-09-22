@@ -104,15 +104,59 @@ evalAtom _ _  = Nothing
 
 evalDefine :: Env -> String -> Ast -> Maybe AstResult
 evalDefine env var body =
-    Just (body, (var, body) : env)
+    Just (Symbol var, (var, body) : env)
+
+evalCall :: Env -> Ast -> [Ast] -> Maybe AstResult
+evalCall env (Symbol f) args = do
+    func <- lookupVar f env
+    case func of
+        Lambda params body ->
+            if length params /= length args
+                then Nothing
+            else do
+                evalArgs <- mapM (\arg -> fmap fst (eval env arg)) args
+                let newEnv = zip params evalArgs ++ env
+                eval newEnv body
+        _ -> Nothing
+evalCall _ _ _ = Nothing
+
+evalArgs :: Env -> [String] -> [Ast] -> Maybe AstResult
+evalArgs env params args = do
+    if length params /= length args
+        then Nothing
+        else do
+            evaledArgs <- mapM (\arg -> fmap fst (eval env arg)) args
+            let newEnv = zip params evaledArgs ++ env
+            Just (Symbol "ok", newEnv)
+
+evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Maybe AstResult
+evalLambdaApp env params body args = do
+    if length params /= length args
+        then Nothing
+        else do
+            evaledArgs <- mapM (\arg -> fmap fst (eval env arg)) args
+            let newEnv = zip params evaledArgs ++ env
+            eval newEnv body
+
+evalSymbolApp :: Env -> String -> [Ast] -> Maybe AstResult
+evalSymbolApp env s args = do
+    case evalSymbols env s args of
+        Just result -> Just (result, env)
+        Nothing -> do
+            func <- lookupVar s env
+            case func of
+                Lambda params body -> evalLambdaApp env params body args
+                _ -> Nothing
 
 evalList :: Env -> [Ast] -> Maybe AstResult
 evalList env [] = Just (List [], env)
-evalList env (Symbol "define" : Symbol var : body : []) = evalDefine env var body
-evalList env (Symbol f : args) = do
-    val <- evalSymbols env f args
-    Just (val, env)
-evalList _ _ = Nothing
+evalList env [x] = eval env x
+evalList env (Symbol s : args) = evalSymbolApp env s args
+evalList env (Lambda params body : args) = evalLambdaApp env params body args
+evalList env (x:xs) = do
+    (_, env1) <- eval env x
+    evalList env1 xs
+
 
 eval :: Env -> Ast -> Maybe AstResult
 eval env (Atom n) = Just (Atom n, env)
@@ -125,10 +169,11 @@ eval env (ABool b) = Just (ABool b, env)
 eval env (If cond t f) = do
     (ABool c, env1) <- eval env cond
     if c then eval env1 t else eval env1 f
-eval env (Call f args) = Nothing
+eval env (Call f args) =
+    case evalCall env f args of
+        Just res -> Just res
+        Nothing  -> Just (Symbol "error", [])
 eval env (Lambda p body) = Just (Lambda p body, env)
-
-
 
 example1 :: Ast
 example1 = List [Symbol "+", Atom 1, Atom 2, Atom 3]
@@ -168,3 +213,25 @@ example12 = List [Symbol "eq?", Atom 0, Atom 0]
 
 example13 :: Ast
 example13 = List [Symbol "eq?", Atom 10, Atom 0]
+
+example14 :: Ast
+example14 = List [Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"]), Atom 2, Atom 3]
+
+exampleDefine :: Ast
+exampleDefine = Define "caca" (Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"]))
+
+exampleMultiDefine :: Ast
+exampleMultiDefine = List
+    [ Define "caca" (Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"]))
+    , Define "baba" (Lambda ["x","y"] (List [Symbol "*", Symbol "x", Symbol "y"]))
+    ]
+
+exampleCall :: Ast
+exampleCall = Call (Symbol "caca") [Atom 2, Atom 3]
+
+exampleDefineCall :: Ast
+exampleDefineCall =
+    List
+      [ Define "caca" (Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"]))
+      , Call (Symbol "caca") [Atom 2, Atom 3]
+      ]
