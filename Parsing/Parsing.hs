@@ -13,7 +13,7 @@ import Control.Applicative (Alternative(..))
 
 type ParserType a = String -> Maybe (a, String)
 
-data Parser a = Parser {runParser :: String -> Maybe (a, String)}
+newtype Parser a = Parser {runParser :: String -> Maybe (a, String)}
 
 instance Functor Parser where
     fmap = fmapParser
@@ -56,7 +56,7 @@ emptyParser :: Parser a
 emptyParser = Parser emptyFunc
 
 altfunc :: ParserType a -> ParserType a -> ParserType a
-altfunc a _ str | Just c <- (a str) = Just c
+altfunc a _ str | Just c <- a str = Just c
 altfunc _ b str = b str
 
 altParser :: Parser a -> Parser a -> Parser a
@@ -183,8 +183,7 @@ parseWhile n s2 = do
 parseBetween :: Int -> String -> String -> Parser String
 parseBetween n s1 s2 = do
     _ <- parseString s1
-    str <- parseWhile n s2
-    return str
+    parseWhile n s2
 
 parseAnyCharExcept :: String -> Parser String
 parseAnyCharExcept str = do
