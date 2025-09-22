@@ -7,12 +7,15 @@
 
 module DataStored where
 
-data Ast =
-      Define String Ast
-    | Atome Int
-    | Symbole String
-    | Liste [Ast]
-    deriving (Show)
+data Ast = Atom Int
+         | Symbol String
+         | List [Ast]
+         | Define String Ast
+         | ABool Bool
+         | If Ast Ast Ast
+         | Call Ast [Ast]
+         | Lambda [String] Ast
+  deriving (Show, Eq)
 
 type Env = [(String, Ast)]
 type AstResult = (Ast, Env)
