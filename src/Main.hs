@@ -43,11 +43,11 @@ readBalancedInput = go 0 ""
 
 startParser :: IO ()
 startParser = do
-  input <- readBalancedInput
-  case runParser parseSExpr input of
-    Nothing  -> putStrLn "Parse error"
-    Just exprs -> print exprs
-  startParser
+    input <- readBalancedInput
+    case runParser parseSExpr input of
+        Nothing  -> putStrLn "Parse error"
+        Just exprs -> print exprs
+    startParser
 
 main :: IO ()
 main = do
