@@ -14,10 +14,10 @@ import Tools
 
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
-    (evalMore env s args)       <|>     (evalLess env s args)   <|>
-    (evalMultiply env s args)   <|>     (evalDivide env s args) <|>
-    (evalModulo env s args)     <|>     (evalGreater env s args)<|>
-    (evalSmaller env s args)
+    (evalMore env s args)       <|>     (evalLess env s args)     <|>
+    (evalMultiply env s args)   <|>     (evalDivide env s args)   <|>
+    (evalModulo env s args)     <|>     (evalGreater env s args)  <|>
+    (evalSmaller env s args)    <|>     (evalEquality env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args=
@@ -88,6 +88,13 @@ evalSmaller env "<" args = do
         Just n
 evalSmaller _ _ _ = Nothing
 
+evalEquality :: Env -> String -> [Ast] -> Maybe Ast
+evalEquality env "eq?" [a, b] = do
+    (va, _) <- eval env a
+    (vb, _) <- eval env b
+    Just (ABool (va == vb))
+evalEquality _ _ _ = Nothing
+
 evalAtom :: Env -> Ast -> Maybe Ast
 evalAtom _ (Atome n)    = Just (Atome n)
 evalAtom env (Symbole s) = lookupVar s env
@@ -149,3 +156,8 @@ example10 = Liste [Symbole "<", Atome 0, Atome 4]
 example11 :: Ast
 example11 = Liste [Symbole "<", Atome 10, Atome 0]
 
+example12 :: Ast
+example12 = List [Symbol "eq?", Atom 0, Atom 0]
+
+example13 :: Ast
+example13 = List [Symbol "eq?", Atom 10, Atom 0]
