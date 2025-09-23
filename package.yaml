@@ -9,12 +9,8 @@ dependencies:
 library:
   source-dirs:
     - Parsing
-    - src
   exposed-modules:
     - Parsing
-    - Ast.Ast
-    - Interpret
-    - Tools
   ghc-options: [-Wall, -Wextra]
 
 executables:
