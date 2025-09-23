@@ -18,7 +18,7 @@ data Ast = Atom Int
   deriving (Show, Eq)
 
 type Env = [(String, Ast)]
-type AstResult = (Ast, Env)
+type AstResult = (Maybe Ast, Env)
 
 lookupVar :: String -> Env -> Maybe Ast
 lookupVar _ [] = Nothing
