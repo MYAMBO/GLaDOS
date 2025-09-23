@@ -13,7 +13,7 @@ import Control.Applicative (Alternative(..))
 
 type ParserType a = String -> Maybe (a, String)
 
-data Parser a = Parser {runParser :: String -> Maybe (a, String)}
+newtype Parser a = Parser {runParser :: String -> Maybe (a, String)}
 
 instance Functor Parser where
     fmap = fmapParser
@@ -40,7 +40,7 @@ pureFunc :: a -> String -> Maybe (a, String)
 pureFunc a str = Just (a, str)
 
 pureParser :: a -> Parser a
-pureParser a = Parser(pureFunc a)
+pureParser a = Parser (pureFunc a)
 
 appfunc :: ParserType (a -> b) -> ParserType a -> ParserType b
 appfunc p1 p2 a | Just (f, b) <- p1 a, Just (d, c) <- p2 b = Just (f d, c)
@@ -56,7 +56,7 @@ emptyParser :: Parser a
 emptyParser = Parser emptyFunc
 
 altfunc :: ParserType a -> ParserType a -> ParserType a
-altfunc a _ str | Just c <- (a str) = Just c
+altfunc a _ str | Just c <- a str = Just c
 altfunc _ b str = b str
 
 altParser :: Parser a -> Parser a -> Parser a
@@ -124,8 +124,7 @@ parseInt = do
     digits <- parseUInt
     return (-digits)
     <|> do
-    digits <- parseUInt
-    return digits
+    parseUInt
 
 parseTuple :: Parser a -> Parser (a, a)
 parseTuple p = do
@@ -184,8 +183,7 @@ parseWhile n s2 = do
 parseBetween :: Int -> String -> String -> Parser String
 parseBetween n s1 s2 = do
     _ <- parseString s1
-    str <- parseWhile n s2
-    return str
+    parseWhile n s2
 
 parseAnyCharExcept :: String -> Parser String
 parseAnyCharExcept str = do
