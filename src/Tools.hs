@@ -8,7 +8,7 @@
 module Tools where
 
 import DataStored
-import Prelude hiding (lookup)
+import Prelude
 
 evalInt :: String -> [Ast] -> Maybe Int
 evalInt _ [] = Just 0
