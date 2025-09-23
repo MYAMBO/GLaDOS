@@ -7,6 +7,9 @@
 
 import Parsing (runParser)
 import ParseSExpr (parseSExpr)
+import Ast.Ast (sexprToAST)
+import Interpret (eval)
+import DataStored (Env, Ast)
 import System.Exit (exitSuccess)
 import System.IO.Error (isEOFError, catchIOError)
 import System.IO (hSetBuffering, BufferMode(..), stdout)
@@ -41,15 +44,33 @@ readBalancedInput = go 0 ""
                         exitSuccess
                         else ioError e)
 
-startParser :: IO ()
-startParser = do
+printResult :: Maybe Ast -> IO ()
+printResult (Just result) = print result
+printResult Nothing       = return ()
+
+repl :: Env -> IO ()
+repl env = do
     input <- readBalancedInput
     case runParser parseSExpr input of
-        Nothing  -> putStrLn "Parse error"
-        Just exprs -> print exprs
-    startParser
+        Nothing -> do
+            putStrLn "Parse error"
+            repl env
+        Just (sexpr, _) ->
+            case sexprToAST sexpr of
+                Nothing -> do
+                    putStrLn "Error: Invalid expression structure"
+                    repl env
+                Just ast ->
+                    case eval env ast of
+                        Nothing -> do
+                            putStrLn "Evaluation error"
+                            repl env
+                        Just (result, newEnv) -> do
+                            printResult result
+                            repl newEnv
 
 main :: IO ()
 main = do
     hSetBuffering stdout NoBuffering
-    startParser
+    putStrLn "Welcome to the GLaDOS Lisp Interpreter!"
+    repl []
