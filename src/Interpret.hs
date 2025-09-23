@@ -130,12 +130,12 @@ evalCall env (Symbol f) args = do
             if length params /= length args
                 then Nothing
             else do
-                evalArgs <- mapM (\arg -> do
+                varevalArgs <- mapM (\arg -> do
                     (mVal, _) <- eval env arg
                     case mVal of
                         Just val -> return val
                         Nothing -> fail "Evaluation failed") args
-                let newEnv = zip params evalArgs ++ env
+                let newEnv = zip params varevalArgs ++ env
                 eval newEnv body
         _ -> Nothing
 evalCall _ _ _ = Nothing
