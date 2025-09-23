@@ -8,6 +8,7 @@
 module Tools where
 
 import DataStored
+import Prelude hiding (lookup)
 
 evalInt :: String -> [Ast] -> Maybe Int
 evalInt _ [] = Just 0
@@ -20,4 +21,4 @@ safeDiv x y = div x y
 
 safeMod :: Int -> Int -> Int
 safeMod _ 0 = error "Modulo by zero"
-safeMod x y = div x y
+safeMod x y = mod x y

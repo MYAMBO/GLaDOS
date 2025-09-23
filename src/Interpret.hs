@@ -48,8 +48,9 @@ evalMultiply _ _ _ = Nothing
 
 evalDivide :: Env -> String -> [Ast] -> Maybe Ast
 evalDivide _ _ args | length args < 2 = Nothing
-evalDivide env "div" args =
-    fmap (Atom . foldl1 safeDiv) (traverse (evalInt env) args)
+evalDivide env "div" args = do
+    ints <- traverse (evalInt env) args
+    return $ Atom (foldl1 safeDiv ints)
   where
     evalInt e ast = do
         (Atom n, _) <- eval e ast
@@ -58,13 +59,15 @@ evalDivide _ _ _ = Nothing
 
 evalModulo :: Env -> String -> [Ast] -> Maybe Ast
 evalModulo _ _ args | length args < 2 = Nothing
-evalModulo env "mod" args = 
-    fmap (Atom . foldl1 safeMod) (traverse (evalInt env) args)
+evalModulo env "mod" args = do
+    ints <- traverse (evalInt env) args
+    return $ Atom (foldl1 safeMod ints)
   where
     evalInt e ast = do
         (Atom n, _) <- eval e ast
         Just n
 evalModulo _ _ _ = Nothing
+
 
 evalGreater :: Env -> String -> [Ast] -> Maybe Ast
 evalGreater _ _ args | null args = Nothing
@@ -172,7 +175,7 @@ eval env (If cond t f) = do
 eval env (Call f args) =
     case evalCall env f args of
         Just res -> Just res
-        Nothing  -> Just (Symbol "error", [])
+        Nothing  -> Nothing
 eval env (Lambda p body) = Just (Lambda p body, env)
 
 example1 :: Ast
