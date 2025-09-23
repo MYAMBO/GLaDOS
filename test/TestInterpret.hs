@@ -144,7 +144,7 @@ exampleDefine = Define "caca" (Lambda ["x","y"] (List [Symbol "+", Symbol "x", S
 exampleMultiDefine :: Ast
 exampleMultiDefine = List
     [ Define "hello" (Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"]))
-    , Define "wolrd" (Lambda ["x","y"] (List [Symbol "*", Symbol "x", Symbol "y"]))
+    , Define "world" (Lambda ["x","y"] (List [Symbol "*", Symbol "x", Symbol "y"]))
     ]
 
 exampleCall :: Ast
