@@ -21,8 +21,9 @@ spec = do
     it "evaluates (+ 5 10) = 15" $ do
       eval [] (List [Symbol "+", Atom 5, Atom 10]) `shouldBe` Just (Just (Atom 15), [])
 
-    it "evaluates (- hello 2 3) = Nothing" $ do
-      eval [] example2 `shouldBe` Nothing
+    it "evaluates example2 with define and subtraction" $ do
+      let expected = Just (Just (Atom 37), [("hello", Atom 42)])
+      eval [] example2 `shouldBe` expected
 
     it "evaluates (- 2 3) = -1" $ do
       eval [] (List [Symbol "-", Atom 2, Atom 3]) `shouldBe` Just (Just (Atom (-1)), [])
@@ -69,12 +70,18 @@ spec = do
       let env = [("x", Atom 5)]
       eval env (Symbol "x") `shouldBe` Just (Just (Atom 5), env)
 
+    it "evaluates exampleDefineTest" $ do
+      eval [] exampleDefineTest `shouldBe` Just (Just (Atom 42), [("test", Atom 42)])
+
   describe "if expressions" $ do
     it "evaluates (if #t 1 2) = 1" $ do
       eval [] (If (ABool True) (Atom 1) (Atom 2)) `shouldBe` Just (Just (Atom 1), [])
 
     it "evaluates (if #f 1 2) = 2" $ do
       eval [] (If (ABool False) (Atom 1) (Atom 2)) `shouldBe` Just (Just (Atom 2), [])
+
+    it "evaluates exampleTest with condition evaluation" $ do
+      eval [] exampleTest `shouldBe` Just (Just (Atom 1), [])
 
   describe "atoms and bools" $ do
     it "evaluates raw Atom" $ do
@@ -83,24 +90,67 @@ spec = do
     it "evaluates raw ABool" $ do
       eval [] (ABool True) `shouldBe` Just (Just (ABool True), [])
 
-  describe "lambda and unsupported" $ do
-    it "evaluates Lambda" $ do
+  describe "lambda expressions" $ do
+    it "evaluates Lambda definition" $ do
       let lam = Lambda ["x"] (Atom 1)
       eval [] lam `shouldBe` Just (Just lam, [])
 
-    it "rejects Call expressions" $ do
-      eval [] (Call (Symbol "f") [Atom 1]) `shouldBe` Nothing
+    it "evaluates lambda application (example14)" $ do
+      eval [] example14 `shouldBe` Just (Just (Atom 5), [])
 
-    it "rejects malformed List" $ do
-      eval [] (List [Symbol "define", Atom 1]) `shouldBe` Nothing
+    it "evaluates exampleDefine" $ do
+      let expected_lambda = Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"])
+      eval [] exampleDefine `shouldBe` Just (Nothing, [("caca", expected_lambda)])
 
+    it "evaluates exampleMultiDefine" $ do
+      let hello_lambda = Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"])
+      let world_lambda = Lambda ["x","y"] (List [Symbol "*", Symbol "x", Symbol "y"])
+      let expected_env = [("world", world_lambda), ("hello", hello_lambda)]
+      eval [] exampleMultiDefine `shouldBe` Just (Nothing, expected_env)
+
+  describe "call expressions" $ do
+    it "evaluates Call with built-in operators" $ do
+      eval [] (Call (Symbol "+") [Atom 1, Atom 2]) `shouldBe` Just (Just (Atom 3), [])
+
+    it "evaluates Call with user-defined function" $ do
+      let env = [("add", Lambda ["x", "y"] (List [Symbol "+", Symbol "x", Symbol "y"]))]
+      eval env (Call (Symbol "add") [Atom 2, Atom 3]) `shouldBe` Just (Just (Atom 5), env)
+
+    it "evaluates exampleDefineCall" $ do
+      let hello_lambda = Lambda ["x"] (Call (Symbol "+") [Symbol "x", Atom 1])
+      eval [] exampleDefineCall `shouldBe` Just (Just (Atom 3), [("hello", hello_lambda)])
+
+  describe "complex lambda examples" $ do
+    it "evaluates exampleLambdaWithCall" $ do
+      let lam = exampleLambdaWithCall
+      eval [] lam `shouldBe` Just (Just lam, [])
+
+    it "applies exampleLambdaWithCall" $ do
+      let application = List [exampleLambdaWithCall, Atom 3, Atom 4]
+      eval [] application `shouldBe` Just (Just (Atom 12), [])
+
+    it "evaluates exampleLambdaWithIf" $ do
+      let lam = exampleLambdaWithIf
+      eval [] lam `shouldBe` Just (Just lam, [])
+
+    it "applies exampleLambdaWithIf with positive number" $ do
+      let application = List [exampleLambdaWithIf, Atom 5]
+      eval [] application `shouldBe` Just (Just (Atom 5), [])
+
+    it "applies exampleLambdaWithIf with negative number" $ do
+      let application = List [exampleLambdaWithIf, Atom (-3)]
+      eval [] application `shouldBe` Just (Just (Atom 0), [])
 
 
 example1 :: Ast
 example1 = List [Symbol "+", Atom 1, Atom 2, Atom 3]
 
 example2 :: Ast
-example2 = List [Symbol "-", Symbol "hello", Atom 2, Atom 3]
+example2 = List 
+    [
+        Define "hello" (Atom 42)
+        , Symbol "-", Symbol "hello", Atom 2, Atom 3
+    ]
 
 example3 :: Ast
 example3 = List [Symbol "*", Atom 2, Atom 4]
@@ -150,9 +200,35 @@ exampleMultiDefine = List
 exampleCall :: Ast
 exampleCall = Call (Symbol "hello") [Atom 2, Atom 3]
 
+-- Fixed example with proper Call syntax
 exampleDefineCall :: Ast
 exampleDefineCall =
     List
-      [ Define "hello" (Lambda ["x","y"] (List [Symbol "+", Symbol "x", Symbol "y"]))
-      , Call (Symbol "hello") [Atom 2, Atom 3]
+      [ Define "hello" (Lambda ["x"] (Call (Symbol "+") [Symbol "x", Atom 1]))
+      , Call (Symbol "hello") [Atom 2]
       ]
+
+exampleTest :: Ast
+exampleTest =
+    If (List [Symbol ">", Atom 10, Atom 4])
+       (Atom 1)
+       (Atom 2)
+
+exampleDefineTest :: Ast
+exampleDefineTest =
+    List
+      [ Define "test" (Atom 42)
+      , Symbol "test"
+      ]
+
+-- Additional examples to test lambda flexibility
+exampleLambdaWithCall :: Ast
+exampleLambdaWithCall = Lambda ["x", "y"] (Call (Symbol "*") [Symbol "x", Symbol "y"])
+
+exampleLambdaWithIf :: Ast
+exampleLambdaWithIf = Lambda ["x"] (If (List [Symbol ">", Symbol "x", Atom 0])
+                                      (Symbol "x")
+                                      (Atom 0))
+
+exampleNestedLambda :: Ast
+exampleNestedLambda = Lambda ["f", "x"] (Call (Symbol "f") [Symbol "x"])

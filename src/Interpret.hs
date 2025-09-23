@@ -20,7 +20,7 @@ evalSymbols env s args =
     (evalSmaller env s args)    <|>     (evalEquality env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
-evalMore env "+" args=
+evalMore env "+" args =
     fmap (Atom . sum) (traverse (evalInt env) args)
     where
         evalInt e ast = do
@@ -114,30 +114,42 @@ evalArgs env params args = do
     if length params /= length args
         then Nothing
         else do
-            evaledArgs <- mapM (\arg -> do
+            _ <- mapM (\arg -> do
                 (mVal, _) <- eval env arg
                 case mVal of
                     Just val -> return val
                     Nothing -> fail "Evaluation failed") args
-            let newEnv = zip params evaledArgs ++ env
-            Just (Just (Symbol "ok"), newEnv)
+            Just (Just (Symbol "ok"), env)
+
+evalBuiltinCall :: Env -> String -> [Ast] -> Maybe AstResult
+evalBuiltinCall env s args = 
+    case evalSymbols env s args of
+        Just result -> Just (Just result, env)
+        Nothing     -> Nothing
+
+evalUserLambda :: Env -> Ast -> [Ast] -> Maybe AstResult
+evalUserLambda env (Lambda params body) args
+    | length params /= length args = Nothing
+    | otherwise = do
+        evaledArgs <- mapM (\arg -> do
+            (mVal, _) <- eval env arg
+            case mVal of
+                Just val -> return val
+                Nothing -> fail "Evaluation failed") args
+        let localEnv = zip params evaledArgs ++ env
+        (res, _) <- eval localEnv body
+        return (res, env)
+evalUserLambda _ _ _ = Nothing
 
 evalCall :: Env -> Ast -> [Ast] -> Maybe AstResult
-evalCall env (Symbol f) args = do
-    func <- lookupVar f env
-    case func of
-        Lambda params body ->
-            if length params /= length args
-                then Nothing
-            else do
-                varevalArgs <- mapM (\arg -> do
-                    (mVal, _) <- eval env arg
-                    case mVal of
-                        Just val -> return val
-                        Nothing -> fail "Evaluation failed") args
-                let newEnv = zip params varevalArgs ++ env
-                eval newEnv body
-        _ -> Nothing
+evalCall env (Symbol s) args =
+    case evalBuiltinCall env s args of
+        Just result -> Just result
+        Nothing -> do
+            func <- lookupVar s env
+            case func of
+                lam@(Lambda _ _) -> evalUserLambda env lam args
+                _ -> Nothing
 evalCall _ _ _ = Nothing
 
 evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Maybe AstResult
@@ -150,8 +162,9 @@ evalLambdaApp env params body args = do
                 case mVal of
                     Just val -> return val
                     Nothing -> fail "Evaluation failed") args
-            let newEnv = zip params evaledArgs ++ env
-            eval newEnv body
+            let localEnv = zip params evaledArgs ++ env
+            (res, _) <- eval localEnv body
+            return (res, env)
 
 evalSymbolApp :: Env -> String -> [Ast] -> Maybe AstResult
 evalSymbolApp env s args = do
@@ -172,7 +185,6 @@ evalList env (x:xs) = do
     (_, env1) <- eval env x
     evalList env1 xs
 
-
 eval :: Env -> Ast -> Maybe AstResult
 eval env (Atom n)     = Just (Just (Atom n), env)
 eval env (Symbol s)   = do
@@ -186,3 +198,5 @@ eval env (If cond t f) = do
     if c then eval env1 t else eval env1 f
 eval env (Call f args) = evalCall env f args
 eval env (Lambda p body) = Just (Just (Lambda p body), env)
+
+
