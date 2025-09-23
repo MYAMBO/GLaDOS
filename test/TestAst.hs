@@ -9,6 +9,7 @@ module TestAst (spec) where
 
 import Test.Hspec
 import Ast.Ast
+import DataStored (Ast(..))
 
 spec :: Spec
 spec = do
