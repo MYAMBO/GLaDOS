@@ -7,9 +7,10 @@
 
 module TestInterpret (spec) where
 
+import Control.Exception (evaluate)
+import DataStored (Ast(..))
 import Test.Hspec
 import Interpret
-import DataStored (Ast(..))
 
 spec :: Spec
 spec = do
@@ -32,14 +33,14 @@ spec = do
     it "evaluates (div 6 2) = 3" $ do
       eval [] example4 `shouldBe` Just (Atom 3, [])
 
-    it "evaluates (div 6 0) = Nothing" $ do
-      eval [] example5 `shouldBe` Nothing
+    it "evaluates (div 6 0) = error call" $ do
+      evaluate (eval [] example5) `shouldThrow` anyErrorCall
 
     it "evaluates (mod 10 4) = 2" $ do
       eval [] example6 `shouldBe` Just (Atom 2, [])
 
-    it "evaluates (mod 10 0) = Nothing" $ do
-      eval [] example7 `shouldBe` Nothing
+    it "evaluates (mod 10 0) = error call" $ do
+      evaluate (eval [] example7) `shouldThrow` anyErrorCall
 
   describe "boolean comparisons" $ do
     it "evaluates (> 10 4) = True" $ do
@@ -62,7 +63,7 @@ spec = do
 
   describe "define and variables" $ do
     it "evaluates (define x 5)" $ do
-      eval [] (Define "x" (Atom 5)) `shouldBe` Just (Atom 5, [("x", Atom 5)])
+      eval [] (Define "x" (Atom 5)) `shouldBe` Just (Symbol "x", [("x", Atom 5)])
 
     it "evaluates symbol lookup after define" $ do
       let env = [("x", Atom 5)]
