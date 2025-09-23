@@ -47,9 +47,8 @@ parseSExprNext = do
     _ <- parseChar '('
     parseSExprList
 
-parseSExpr :: Parser [SExpr]
-parseSExpr = parseSExprNext
+parseSExpr :: Parser SExpr
+parseSExpr = SList <$> parseSExprNext
     <|> do
     _ <- parseMany (parseAnyChar " \n\t")
-    res <- parseAtom
-    return [res]
+    parseAtom
