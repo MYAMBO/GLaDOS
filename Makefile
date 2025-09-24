@@ -6,8 +6,8 @@
 ##
 
 STACK = stack
-EXECUTABLE = $(shell $(STACK) path --local-install-root)/bin/GLaDOS
-OUTPUT = ./GLaDOS
+EXECUTABLE = $(shell $(STACK) path --local-install-root)/bin/glados
+OUTPUT = ./glados
 TEST_DIR = test
 COVERAGE_DIR = $(TEST_DIR)/coverage
 
