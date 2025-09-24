@@ -9,6 +9,7 @@ module Interpret where
 
 import Control.Applicative ((<|>))
 import Tools hiding (evalInt)
+import Data.Either (Either(..))
 import DataStored
 
 
@@ -98,21 +99,21 @@ evalEquality env "eq?" [a, b] = do
     Just (ABool (va == vb))
 evalEquality _ _ _ = Nothing
 
-evalAtom :: Env -> Ast -> Maybe AstResult
-evalAtom env (Atom n) = Just (Just (Atom n), env)
+evalAtom :: Env -> Ast -> Either AstResult
+evalAtom env (Atom n) = Right (Just (Atom n), env)
 evalAtom env (Symbol s) = do
     v <- lookupVar s env
-    Just (Just (v), env)
+    Right (Just (v), env)
 evalAtom _ _  = Nothing
 
-evalDefine :: Env -> String -> Ast -> Maybe AstResult
+evalDefine :: Env -> String -> Ast -> Either AstResult
 evalDefine env name expr = do
     (val, _) <- eval env expr
     case val of
-        Just v  -> Just (Nothing, (name, v) : env)
+        Just v  -> Right (Nothing, (name, v) : env)
         Nothing -> Nothing
 
-evalArgs :: Env -> [String] -> [Ast] -> Maybe AstResult
+evalArgs :: Env -> [String] -> [Ast] -> Either AstResult
 evalArgs env params args = do
     if length params /= length args
         then Nothing
@@ -122,15 +123,15 @@ evalArgs env params args = do
                 case mVal of
                     Just val -> return val
                     Nothing -> fail "Evaluation failed") args
-            Just (Just (Symbol "ok"), env)
+            Right (Just (Symbol "ok"), env)
 
-evalBuiltinCall :: Env -> String -> [Ast] -> Maybe AstResult
+evalBuiltinCall :: Env -> String -> [Ast] -> Either AstResult
 evalBuiltinCall env s args = 
     case evalSymbols env s args of
-        Just result -> Just (Just result, env)
+        Just result -> Right (Just result, env)
         Nothing     -> Nothing
 
-evalUserLambda :: Env -> Ast -> [Ast] -> Maybe AstResult
+evalUserLambda :: Env -> Ast -> [Ast] -> Either AstResult
 evalUserLambda env (Lambda params body) args
     | length params /= length args = Nothing
     | otherwise = do
@@ -144,10 +145,10 @@ evalUserLambda env (Lambda params body) args
         return (res, env)
 evalUserLambda _ _ _ = Nothing
 
-evalCall :: Env -> Ast -> [Ast] -> Maybe AstResult
+evalCall :: Env -> Ast -> [Ast] -> Either AstResult
 evalCall env (Symbol s) args =
     case evalBuiltinCall env s args of
-        Just result -> Just result
+        Just result -> Right result
         Nothing -> do
             func <- lookupVar s env
             case func of
@@ -155,7 +156,7 @@ evalCall env (Symbol s) args =
                 _ -> Nothing
 evalCall _ _ _ = Nothing
 
-evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Maybe AstResult
+evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Either AstResult
 evalLambdaApp env params body args = do
     if length params /= length args
         then Nothing
@@ -169,17 +170,17 @@ evalLambdaApp env params body args = do
             (res, _) <- eval localEnv body
             return (res, env)
 
-evalSymbolApp :: Env -> String -> [Ast] -> Maybe AstResult
+evalSymbolApp :: Env -> String -> [Ast] -> Either AstResult
 evalSymbolApp env s args = do
     case evalSymbols env s args of
-        Just result -> Just (Just (result), env)
+        Just result -> Right (Just (result), env)
         Nothing -> do
             func <- lookupVar s env
             case func of
                 Lambda params body -> evalLambdaApp env params body args
                 _ -> Nothing
 
-evalList :: Env -> [Ast] -> Maybe AstResult
+evalList :: Env -> [Ast] -> Either AstResult
 evalList env [] = Just (Just (List []), env)
 evalList env [x] = eval env x
 evalList env (Symbol s : args) = evalSymbolApp env s args
@@ -188,16 +189,16 @@ evalList env (x:xs) = do
     (_, env1) <- eval env x
     evalList env1 xs
 
-eval :: Env -> Ast -> Maybe AstResult
-eval env (Atom n)     = Just (Just (Atom n), env)
+eval :: Env -> Ast -> Either AstResult
+eval env (Atom n)     = Right (Just (Atom n), env)
 eval env (Symbol s)   = do
     v <- lookupVar s env
-    Just (Just v, env)
+    Right (Just v, env)
 eval env (Define var b) = evalDefine env var b
 eval env (List xs)    = evalList env xs
-eval env (ABool b)    = Just (Just (ABool b), env)
+eval env (ABool b)    = Right (Just (ABool b), env)
 eval env (If cond t f) = do
     (Just (ABool c), env1) <- eval env cond
     if c then eval env1 t else eval env1 f
 eval env (Call f args) = evalCall env f args
-eval env (Lambda p body) = Just (Just (Lambda p body), env)
+eval env (Lambda p body) = Right (Just (Lambda p body), env)
