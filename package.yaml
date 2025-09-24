@@ -1,4 +1,4 @@
-name: GLaDOS
+name: glados
 version: "0.1.0.0"
 build-type: Simple
 
@@ -14,22 +14,22 @@ library:
   ghc-options: [-Wall, -Wextra]
 
 executables:
-  GLaDOS:
+  glados:
     main: Main.hs
     source-dirs:
       - src
     dependencies:
-      - GLaDOS
+      - glados
     ghc-options: [-Wall, -Wextra]
 
 tests:
-  GLaDOS-test:
+  glados-test:
     main: Test.hs
     source-dirs:
       - test
       - src
     dependencies:
-      - GLaDOS
+      - glados
       - silently
       - hspec
     ghc-options: [-threaded, -fhpc]
