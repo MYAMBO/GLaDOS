@@ -18,7 +18,8 @@ evalSymbols env s args =
     (evalModulo env s args)     <|>     (evalGreater env s args)  <|>
     (evalSmaller env s args)    <|>     (evalEquality env s args) <|>
     (evalListFunc env s args)   <|>     (evalCons env s args)     <|>
-    (evalCar env s args)        <|>     (evalNull env s args)
+    (evalCar env s args)        <|>     (evalNull env s args)     <|>
+    (evalCdr env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args =
@@ -36,6 +37,12 @@ evalNull env "null?" [arg] = do
         List [] -> ABool True
         _       -> ABool False
 evalNull _ _ _ = Nothing
+
+evalCdr :: Env -> String -> [Ast] -> Maybe Ast
+evalCdr env "cdr" [arg] = do
+    (Just (List (_:xs)), _) <- eval env arg
+    Just $ List xs
+evalCdr _ _ _ = Nothing
 
 evalCar :: Env -> String -> [Ast] -> Maybe Ast
 evalCar env "car" [arg] = do
