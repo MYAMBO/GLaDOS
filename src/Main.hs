@@ -7,7 +7,7 @@
 
 import Parsing (runParser)
 import ParseSExpr (parseSExpr)
-import Ast.Ast (sexprToAST)
+import Ast.Ast (sexprToAST, SExpr(..))
 import Interpret (eval)
 import DataStored (Env, Ast)
 import System.Exit (exitSuccess)
@@ -55,6 +55,7 @@ repl env = do
         Nothing -> do
             putStrLn "Parse error"
             repl env
+        Just ((SSymbol ""), _) -> repl env
         Just (sexpr, _) ->
             case sexprToAST sexpr of
                 Nothing -> do
