@@ -72,6 +72,10 @@ spec = do
 
     it "evaluates exampleDefineTest" $ do
       eval [] exampleDefineTest `shouldBe` Just (Just (Atom 42), [("test", Atom 42)])
+    
+    it "evaluates symbol addition after define" $ do
+      let env = [("test", Call (Symbol "+") [Atom 5,Atom 5])]
+      eval env (Symbol "test") `shouldBe` Just ( Just (Atom 10), env) 
 
   describe "if expressions" $ do
     it "evaluates (if #t 1 2) = 1" $ do
