@@ -13,6 +13,7 @@ import DataStored (Env, Ast)
 import System.Exit (exitSuccess)
 import System.IO.Error (isEOFError, catchIOError)
 import System.IO (hSetBuffering, BufferMode(..), stdout)
+import Ast.AstPrint (printAst)
 
 parenBalance :: String -> Int
 parenBalance = foldl update 0
@@ -45,7 +46,7 @@ readBalancedInput = go 0 ""
                         else ioError e)
 
 printResult :: Maybe Ast -> IO ()
-printResult (Just result) = print result
+printResult (Just result) = putStrLn (printAst result)
 printResult Nothing       = return ()
 
 repl :: Env -> IO ()
