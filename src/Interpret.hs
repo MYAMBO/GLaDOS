@@ -106,8 +106,11 @@ evalAtom env (Symbol s) = do
 evalAtom _ _  = Nothing
 
 evalDefine :: Env -> String -> Ast -> Maybe AstResult
-evalDefine env var body =
-    Just (Nothing, (var, body) : env)
+evalDefine env name expr = do
+    (val, _) <- eval env expr
+    case val of
+        Just v  -> Just (Nothing, (name, v) : env)
+        Nothing -> Nothing
 
 evalArgs :: Env -> [String] -> [Ast] -> Maybe AstResult
 evalArgs env params args = do
@@ -198,5 +201,3 @@ eval env (If cond t f) = do
     if c then eval env1 t else eval env1 f
 eval env (Call f args) = evalCall env f args
 eval env (Lambda p body) = Just (Just (Lambda p body), env)
-
-
