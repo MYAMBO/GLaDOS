@@ -11,13 +11,14 @@ import Control.Applicative ((<|>))
 import Tools hiding (evalInt)
 import DataStored
 
-
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
     (evalMore env s args)       <|>     (evalLess env s args)     <|>
     (evalMultiply env s args)   <|>     (evalDivide env s args)   <|>
     (evalModulo env s args)     <|>     (evalGreater env s args)  <|>
-    (evalSmaller env s args)    <|>     (evalEquality env s args)
+    (evalSmaller env s args)    <|>     (evalEquality env s args) <|>
+    (evalListFunc env s args)   <|>     (evalCons env s args)     <|>
+    (evalCar env s args)        <|>     (evalNull env s args)
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args =
@@ -27,6 +28,36 @@ evalMore env "+" args =
             (Just (Atom n), _) <- eval e ast
             Just n
 evalMore _ _ _ = Nothing
+
+evalNull :: Env -> String -> [Ast] -> Maybe Ast
+evalNull env "null?" [arg] = do
+    lst <- eval env arg >>= fst
+    return $ case lst of
+        List [] -> ABool True
+        _       -> ABool False
+evalNull _ _ _ = Nothing
+
+evalCar :: Env -> String -> [Ast] -> Maybe Ast
+evalCar env "car" [arg] = do
+    List (x:_) <- eval env arg >>= fst
+    return x
+evalCar _ _ _ = Nothing
+
+evalCons :: Env -> String -> [Ast] -> Maybe Ast
+evalCons env "cons" [element, listToPrepend] = do
+    List xs <- eval env listToPrepend >>= fst
+    x <- eval env element >>= fst
+    return $ List (x : xs)
+evalCons _ _ _ = Nothing
+
+evalListFunc :: Env -> String -> [Ast] -> Maybe Ast
+evalListFunc env "list" args = fmap List (traverse evalArg args)
+  where
+    evalArg :: Ast -> Maybe Ast
+    evalArg ast = do
+        (res, _) <- eval env ast
+        res
+evalListFunc _ _ _ = Nothing
 
 evalLess :: Env -> String -> [Ast] -> Maybe Ast
 evalLess env "-" args = do
