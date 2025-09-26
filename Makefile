@@ -39,6 +39,6 @@ tests_run:
 	@stack hpc report --all --destdir $(COVERAGE_DIR)
 
 xml_gen:
-	@stack test --test-arguments="--xml=report.xml"
+	@stack test --test-arguments="--xml=build/test-results/test/results.xml"
 
 re: fclean all
