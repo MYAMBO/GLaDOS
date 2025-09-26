@@ -30,11 +30,15 @@ fclean: clean
 	@rm -rf .stack-work $(OUTPUT)
 	@rm -rf $(COVERAGE_DIR)/*
 	@rm -rf .hpc/
+	@rm -f report.xml
 
 tests_run:
 	@echo "Running tests..."
 	@$(STACK) test --coverage
 	@mkdir -p $(COVERAGE_DIR)
 	@stack hpc report --all --destdir $(COVERAGE_DIR)
+
+xml_gen:
+	@stack test --test-arguments="--xml=report.xml"
 
 re: fclean all
