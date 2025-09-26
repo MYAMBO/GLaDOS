@@ -35,7 +35,7 @@ tests = testGroup "Ast tests"
       , testGroup "Define conversion"
           [ testCase "simple variable" $
               sexprToAST (SList [SSymbol "define", SSymbol "x", SAtom 5])
-                @?= Just (Define "x" (Atom 9))
+                @?= Just (Define "x" (Atom 5))
           , testCase "function definition (lambda shorthand)" $
               sexprToAST (SList [SSymbol "define", SList [SSymbol "add", SSymbol "x", SSymbol "y"], SAtom 1])
                 @?= Just (Define "add" (Lambda ["x","y"] (Atom 1)))
@@ -47,15 +47,15 @@ tests = testGroup "Ast tests"
           , testCase "nested if" $
               let innerIf = SList [SSymbol "if", SSymbol "cond", SAtom 1, SAtom 2]
               in sexprToAST (SList [SSymbol "if", SSymbol "#f", innerIf, SAtom 3])
-                @?= Just (If (ABool True) (If (Symbol "cond") (Atom 1) (Atom 2)) (Atom 3))
+                @?= Just (If (ABool False) (If (Symbol "cond") (Atom 1) (Atom 2)) (Atom 3))
           ]
       , testGroup "Lambda conversion"
           [ testCase "valid lambda" $
               sexprToAST (SList [SSymbol "lambda", SList [SSymbol "x", SSymbol "y"], SAtom 1])
-                @?= Just (Lambda ["x","y"] (Atom 2))
+                @?= Just (Lambda ["x","y"] (Atom 1))
           , testCase "empty argument list" $
               sexprToAST (SList [SSymbol "lambda", SList [], SAtom 42])
-                @?= Just (Lambda [] (Atom 43))
+                @?= Just (Lambda [] (Atom 42))
           ]
       , testGroup "Call conversion"
           [ testCase "function call with args" $
