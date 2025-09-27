@@ -6,8 +6,6 @@ env:
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 permissions:
   contents: read
@@ -55,6 +53,7 @@ jobs:
   push_to_mirror:
     needs:
       - set_current_url
+      - build
     if: ${{ !contains(needs.set_current_url.outputs.current_url, github.repository) || !contains(github.repository, needs.set_current_url.outputs.current_url) }} && ${{ github.event_name }} == 'push'
     runs-on: ubuntu-latest
     steps:
