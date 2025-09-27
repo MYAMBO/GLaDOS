@@ -74,7 +74,7 @@ tests = testGroup "Parsing tests"
       , testCase "parse with finding 4 separators but only 3 presents" $
           runParser (parseBetween 4 "-{|" "|}-") "-{|hello word|}-|}-|}-" @?= Nothing
       , testCase "parse with finding all separators" $
-          runParser (parseBetween (-1) "-{|" "|}-") "-{|hello|}-|}-|}-word" @?= Just ("hello|}-|}-", "word")
+          runParser (parseBetween (-1) "-{|" "|}-") "-{|hello|}-|}-|}-word" @?= Just ("hello|}-|}-", "wolrd")
       , testCase "failing with -1" $
           runParser (parseBetween (-1) "-{|" "|}-") "-{|hello word" @?= Nothing
       , testCase "failing with -99" $
