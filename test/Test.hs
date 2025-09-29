@@ -1,17 +1,20 @@
-{-
--- EPITECH PROJECT, 2025
--- GLaDOS
--- File description:
--- Test
--}
+{-# LANGUAGE OverloadedStrings #-}
 
-import Test.Hspec
+import Test.Tasty
+import Test.Tasty.Runners.AntXML (antXMLRunner)
+
+
+import System.IO
+import Text.Printf
+
 import qualified TestParsing
 import qualified TestInterpret
 import qualified TestAst
 
 main :: IO ()
-main = hspec $ do
-    TestParsing.spec
-    TestInterpret.spec
-    TestAst.spec
+main = defaultMainWithIngredients [antXMLRunner] $
+  testGroup "Tests"
+    [ TestParsing.tests
+    , testGroup "AST" [TestAst.tests]
+    , testGroup "Interpret" [TestInterpret.tests]
+    ]

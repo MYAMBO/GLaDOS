@@ -1,100 +1,106 @@
-{-
--- EPITECH PROJECT, 2025
--- GLaDOS
--- File description:
--- TestParsing
--}
-
-module TestParsing (spec) where
+-- test/TestParsing.hs
+module TestParsing (tests) where
 
 import Control.Applicative (Alternative(..))
-import Test.Hspec
+import Test.Tasty
+import Test.Tasty.HUnit
 import Parsing
 
-spec :: Spec
-spec = do
-  describe "empty parser" $ do
-    it "empty parser fail" $ do
-      runParser (empty :: Parser Char) "abc" `shouldBe` Nothing
+tests :: TestTree
+tests = testGroup "Parsing tests"
+  [ testGroup "empty parser"
+      [ testCase "empty parser fail" $
+          runParser (empty :: Parser Char) "abc" @?= Nothing
+      ]
 
-  describe "parseChar" $ do
-    it "invalid parse" $ do
-      runParser (parseChar 'a') "bcd" `shouldBe` Nothing
-    it "parse char" $ do
-      runParser (parseChar 'a') "abc" `shouldBe` Just ('a', "bc")
+  , testGroup "parseChar"
+      [ testCase "invalid parse" $
+          runParser (parseChar 'a') "bcd" @?= Nothing
+      , testCase "parse char" $
+          runParser (parseChar 'a') "abc" @?= Just ('a', "bc")
+      ]
 
-  describe "parseAnd" $ do
-    it "first fail" $ do
-      runParser (parseAnd (parseChar 'a') (parseChar 'a')) "bcd" `shouldBe` Nothing
-    it "second fail" $ do
-      runParser (parseAnd (parseChar 'a') (parseChar 'a')) "abcd" `shouldBe` Nothing
-    it "success" $ do
-      runParser (parseAnd (parseChar 'a') (parseChar 'b')) "abcd" `shouldBe` Just (('a', 'b'), "cd")
+  , testGroup "parseAnd"
+      [ testCase "first fail" $
+          runParser (parseAnd (parseChar 'a') (parseChar 'a')) "bcd" @?= Nothing
+      , testCase "second fail" $
+          runParser (parseAnd (parseChar 'a') (parseChar 'a')) "abcd" @?= Nothing
+      , testCase "success" $
+          runParser (parseAnd (parseChar 'a') (parseChar 'b')) "abcd" @?= Just (('a','b'), "cd")
+      ]
 
-  describe "parseInt" $ do
-    it "invalid parse" $ do
-      runParser parseInt "hello word" `shouldBe` Nothing
-    it "parse positive int" $ do
-      runParser parseInt "42abc" `shouldBe` Just (42, "abc")
-    it "parse negative int" $ do
-      runParser parseInt "-15abc" `shouldBe` Just (-15, "abc")
-    it "parse int at the end of string" $ do
-      runParser parseInt "42" `shouldBe` Just (42, "")
+  , testGroup "parseInt"
+      [ testCase "invalid parse" $
+          runParser parseInt "hello word" @?= Nothing
+      , testCase "parse positive int" $
+          runParser parseInt "42abc" @?= Just (42, "abc")
+      , testCase "parse negative int" $
+          runParser parseInt "-15abc" @?= Just (-15, "abc")
+      , testCase "parse int at the end of string" $
+          runParser parseInt "42" @?= Just (42, "")
+      ]
 
-  describe "parseTuple" $ do
-    it "invalid parse" $ do
-      runParser (parseTuple parseInt) "(42, -84)hello word" `shouldBe` Nothing
-    it "parse positif tuple" $ do
-      runParser (parseTuple parseInt) "(12,56)hello word" `shouldBe` Just ((12, 56), "hello word")
-    it "parse negatif tuple" $ do
-      runParser (parseTuple parseInt) "(-412,-5678)hello word" `shouldBe` Just ((-412, -5678), "hello word")
+  , testGroup "parseTuple"
+      [ testCase "invalid parse" $
+          runParser (parseTuple parseInt) "(42, -84)hello word" @?= Nothing
+      , testCase "parse positif tuple" $
+          runParser (parseTuple parseInt) "(12,56)hello word" @?= Just ((12,56), "hello word")
+      , testCase "parse negatif tuple" $
+          runParser (parseTuple parseInt) "(-412,-5678)hello word" @?= Just ((-412,-5678), "hello word")
+      ]
 
-  describe "parseTruple" $ do
-    it "invalid parse" $ do
-      runParser parseTruple "(42, -84, 789)hello word" `shouldBe` Nothing
-    it "parse positif truple" $ do
-      runParser parseTruple "(12,56,78)hello word" `shouldBe` Just ((12, 56, 78), "hello word")
-    it "parse negatif truple" $ do
-      runParser parseTruple "(-412,-5678,-2)hello word" `shouldBe` Just ((-412, -5678, -2), "hello word")
+  , testGroup "parseTruple"
+      [ testCase "invalid parse" $
+          runParser parseTruple "(42, -84, 789)hello word" @?= Nothing
+      , testCase "parse positif truple" $
+          runParser parseTruple "(12,56,78)hello word" @?= Just ((12,56,78), "hello word")
+      , testCase "parse negatif truple" $
+          runParser parseTruple "(-412,-5678,-2)hello word" @?= Just ((-412,-5678,-2), "hello word")
+      ]
 
-  describe "parseBetween" $ do
-    it "invalid parse" $ do
-      runParser (parseBetween 1 "[" "]") "[hello word" `shouldBe` Nothing
-    it "parse str" $ do
-      runParser (parseBetween 1 "\"" "\"") "\"hello word\"blabla" `shouldBe` Just ("hello word", "blabla")
-    it "parse str at the end" $ do
-      runParser (parseBetween 1 "\"" "\"") "\"hello word\"" `shouldBe` Just ("hello word", "")
-    it "parse with different separator" $ do
-      runParser (parseBetween 1 "-{|" "|}-") "-{|hello word|}-blabla" `shouldBe` Just ("hello word", "blabla")
-    it "parse with different separator at the end" $ do
-      runParser (parseBetween 1 "-{|" "|}-") "-{|hello word|}-" `shouldBe` Just ("hello word", "")
-    it "parse with finding 2 separators" $ do
-      runParser (parseBetween 2 "-{|" "|}-") "-{|hello word|}-|}-|}-" `shouldBe` Just ("hello word|}-", "|}-")
-    it "parse with finding 4 separators but only 3 presents" $ do
-      runParser (parseBetween 4 "-{|" "|}-") "-{|hello word|}-|}-|}-" `shouldBe` Nothing
-    it "parse with finding all separators" $ do
-      runParser (parseBetween (-1) "-{|" "|}-") "-{|hello|}-|}-|}-word" `shouldBe` Just ("hello|}-|}-", "word")
-    it "failing with -1" $ do
-      runParser (parseBetween (-1) "-{|" "|}-") "-{|hello word" `shouldBe` Nothing
-    it "failing with -99" $ do
-      runParser (parseBetween (-99) "-{|" "|}-") "-{|hello word" `shouldBe` Nothing
+  , testGroup "parseBetween"
+      [ testCase "invalid parse" $
+          runParser (parseBetween 1 "[" "]") "[hello word" @?= Nothing
+      , testCase "parse str" $
+          runParser (parseBetween 1 "\"" "\"") "\"hello word\"blabla" @?= Just ("hello word", "blabla")
+      , testCase "parse str at the end" $
+          runParser (parseBetween 1 "\"" "\"") "\"hello word\"" @?= Just ("hello word", "")
+      , testCase "parse with different separator" $
+          runParser (parseBetween 1 "-{|" "|}-") "-{|hello word|}-blabla" @?= Just ("hello word", "blabla")
+      , testCase "parse with different separator at the end" $
+          runParser (parseBetween 1 "-{|" "|}-") "-{|hello word|}-" @?= Just ("hello word", "")
+      , testCase "parse with finding 2 separators" $
+          runParser (parseBetween 2 "-{|" "|}-") "-{|hello word|}-|}-|}-" @?= Just ("hello word|}-", "|}-")
+      , testCase "parse with finding 4 separators but only 3 presents" $
+          runParser (parseBetween 4 "-{|" "|}-") "-{|hello word|}-|}-|}-" @?= Nothing
+      , testCase "parse with finding all separators" $
+          runParser (parseBetween (-1) "-{|" "|}-") "-{|hello|}-|}-|}-word" @?= Just ("hello|}-|}-", "word")
+      , testCase "failing with -1" $
+          runParser (parseBetween (-1) "-{|" "|}-") "-{|hello word" @?= Nothing
+      , testCase "failing with -99" $
+          runParser (parseBetween (-99) "-{|" "|}-") "-{|hello word" @?= Nothing
+      ]
 
-  describe "tryParser" $ do
-    it "with success" $ do
-      runParser (tryMaybe (parseInt)) "-42" `shouldBe` Just (Just (-42), "")
-    it "without success" $ do
-      runParser (tryMaybe (parseInt)) "f-42" `shouldBe` Just (Nothing, "f-42")
-  
-  describe "parseAnyCharExcept" $ do
-    it "with a char" $ do
-      runParser (parseAnyCharExcept "d") "abcdefg" `shouldBe` Just ("abc", "defg")
-    it "with many char" $ do
-      runParser (parseAnyCharExcept "wfgmpxdc") "abcdefg" `shouldBe` Just ("ab", "cdefg")
-    it "without char" $ do
-      runParser (parseAnyCharExcept "z") "abcdefg" `shouldBe` Just ("abcdefg", "")
+  , testGroup "tryParser"
+      [ testCase "with success" $
+          runParser (tryMaybe parseInt) "-42" @?= Just (Just (-42), "")
+      , testCase "without success" $
+          runParser (tryMaybe parseInt) "f-42" @?= Just (Nothing, "f-42")
+      ]
 
-  describe "parseWithoutConsum" $ do
-    it "success" $ do
-      runParser (parseWithoutConsum (parseString "hello")) "hello word" `shouldBe` Just ("", "hello word")
-    it "fail" $ do
-      runParser (parseWithoutConsum (parseString "hello")) "not hello word" `shouldBe` Nothing
+  , testGroup "parseAnyCharExcept"
+      [ testCase "with a char" $
+          runParser (parseAnyCharExcept "d") "abcdefg" @?= Just ("abc", "defg")
+      , testCase "with many char" $
+          runParser (parseAnyCharExcept "wfgmpxdc") "abcdefg" @?= Just ("ab", "cdefg")
+      , testCase "without char" $
+          runParser (parseAnyCharExcept "z") "abcdefg" @?= Just ("abcdefg", "")
+      ]
+
+  , testGroup "parseWithoutConsum"
+      [ testCase "success" $
+          runParser (parseWithoutConsum (parseString "hello")) "hello word" @?= Just ("", "hello word")
+      , testCase "fail" $
+          runParser (parseWithoutConsum (parseString "hello")) "not hello word" @?= Nothing
+      ]
+  ]
