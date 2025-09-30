@@ -2,7 +2,7 @@
 
 import Test.Tasty
 import Test.Tasty.Runners.AntXML (antXMLRunner)
-
+import Test.Tasty.Ingredients.Basic
 
 import System.IO
 import Text.Printf
@@ -12,7 +12,7 @@ import qualified TestInterpret
 import qualified TestAst
 
 main :: IO ()
-main = defaultMainWithIngredients [antXMLRunner] $
+main = defaultMainWithIngredients [consoleTestReporter, antXMLRunner, listingTests] $
   testGroup "Tests"
     [ TestParsing.tests
     , testGroup "AST" [TestAst.tests]

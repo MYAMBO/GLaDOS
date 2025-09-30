@@ -34,4 +34,5 @@ tests:
       - tasty
       - tasty-hunit
       - tasty-ant-xml
+      - tasty-hspec
     ghc-options: [-threaded, -fhpc]
