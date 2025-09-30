@@ -142,8 +142,8 @@ evalCall env (Symbol s) args =
         Right result -> Right result
         Left _ -> case lookupVar s env of
             Just lam@(Lambda _ _) -> evalUserLambda env lam args
-            _ -> Left "Exception: evalCall 1"
-evalCall _ _ _ = Left "Exception: EvalCall 2"
+            _ -> Left "Exception: undefined function or invalid call"
+evalCall _ s _ = Left "Exception: invalid call"
 
 evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Either String AstResult
 evalLambdaApp env params body args = do
