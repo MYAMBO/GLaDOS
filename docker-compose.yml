@@ -1,6 +1,7 @@
 services:
   build-ubuntu:
     container_name: glados-build-ubuntu
+    image: glados-build-ubuntu:latest
     build:
       context: .
       dockerfile: "./docker/Dockerfile-ubuntu"
@@ -10,6 +11,7 @@ services:
       - 1.1.1.1
   build-arch:
     container_name: glados-build-arch
+    image: glados-build-arch:latest
     build:
       context: .
       dockerfile: "./docker/Dockerfile-arch"
@@ -19,6 +21,7 @@ services:
       - 1.1.1.1
   build-fedora:
     container_name: glados-build-fedora
+    image: glados-build-fedora:latest
     build:
       context: .
       dockerfile: "./docker/Dockerfile-fedora"
