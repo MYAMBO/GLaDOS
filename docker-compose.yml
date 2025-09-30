@@ -9,6 +9,9 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    tmpfs:
+      - /tmp:size=6g
+
   build-arch:
     container_name: glados-build-arch
     image: glados-build-arch:latest
@@ -19,6 +22,9 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    tmpfs:
+      - /tmp:size=6g
+
   build-fedora:
     container_name: glados-build-fedora
     image: glados-build-fedora:latest
@@ -29,3 +35,5 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    tmpfs:
+      - /tmp:size=6g
