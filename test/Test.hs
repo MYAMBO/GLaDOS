@@ -12,7 +12,7 @@ import qualified TestInterpret
 import qualified TestAst
 
 main :: IO ()
-main = defaultMainWithIngredients [consoleTestReporter, antXMLRunner, listingTests] $
+main = defaultMainWithIngredients [antXMLRunner, consoleTestReporter, listingTests] $
   testGroup "Tests"
     [ TestParsing.tests
     , testGroup "AST" [TestAst.tests]
