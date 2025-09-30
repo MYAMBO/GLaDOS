@@ -1,4 +1,5 @@
 GLaDOS*
+glados*
 .stack-work
 .hpc
 dist-newstyle
@@ -10,3 +11,4 @@ log.txt
 hpc*
 coverage.tix
 Main
+.idea

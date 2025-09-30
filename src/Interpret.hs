@@ -12,13 +12,19 @@ import Tools hiding (evalInt)
 import Data.Either()
 import DataStored
 
-
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
 evalSymbols env s args = 
     (evalMore env s args)       <|>     (evalLess env s args)     <|>
     (evalMultiply env s args)   <|>     (evalDivide env s args)   <|>
     (evalModulo env s args)     <|>     (evalGreater env s args)  <|>
-    (evalSmaller env s args)    <|>     (evalEquality env s args)
+    (evalSmaller env s args)    <|>     (evalEquality env s args) <|>
+    (evalListFunc env s args)   <|>     (evalCons env s args)     <|>
+    (evalCar env s args)        <|>     (evalNull env s args)     <|>
+    (evalCdr env s args)
+
+eitherToMaybe :: Either e a -> Maybe a
+eitherToMaybe (Right x) = Just x
+eitherToMaybe _         = Nothing
 
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args =
@@ -29,6 +35,44 @@ evalMore env "+" args =
                 Right ( Just (Atom n), _) -> Just n
                 _ -> Nothing
 evalMore _ _ _ = Nothing
+
+evalNull :: Env -> String -> [Ast] -> Maybe Ast
+evalNull env "null?" [arg] = do
+    (mval, _) <- eitherToMaybe (eval env arg)
+    case mval of
+        Just (List []) -> Just (ABool True)
+        Just (List _)  -> Just (ABool False)
+        _              -> Nothing
+evalNull _ _ _ = Nothing
+
+
+evalCdr :: Env -> String -> [Ast] -> Maybe Ast
+evalCdr env "cdr" [arg] = do
+    (Just (List (_:xs)), _) <- eitherToMaybe (eval env arg)
+    Just $ List xs
+evalCdr _ _ _ = Nothing
+
+evalCar :: Env -> String -> [Ast] -> Maybe Ast
+evalCar env "car" [arg] = do
+    List (x:_) <- eitherToMaybe (eval env arg) >>= fst
+    return x
+evalCar _ _ _ = Nothing
+
+evalCons :: Env -> String -> [Ast] -> Maybe Ast
+evalCons env "cons" [element, listToPrepend] = do
+    List xs <- eitherToMaybe (eval env listToPrepend) >>= fst
+    x <- eitherToMaybe (eval env element) >>= fst
+    return $ List (x : xs)
+evalCons _ _ _ = Nothing
+
+evalListFunc :: Env -> String -> [Ast] -> Maybe Ast
+evalListFunc env "list" args = fmap List (traverse evalArg args)
+  where
+    evalArg :: Ast -> Maybe Ast
+    evalArg ast = do
+        (res, _) <- eitherToMaybe (eval env ast)
+        res
+evalListFunc _ _ _ = Nothing
 
 evalLess :: Env -> String -> [Ast] -> Maybe Ast
 evalLess env "-" args = do
@@ -104,9 +148,6 @@ evalEquality env "eq?" [a, b] = do
         (va, _) <- eitherToMaybe (eval env a)
         (vb, _) <- eitherToMaybe (eval env b)
         Just (ABool (va == vb))
-    where
-        eitherToMaybe (Left _)  = Nothing
-        eitherToMaybe (Right x) = Just x
 evalEquality _ _ _ = Nothing
 
 evalDefine :: Env -> String -> Ast -> Either String AstResult
@@ -143,7 +184,7 @@ evalCall env (Symbol s) args =
         Left _ -> case lookupVar s env of
             Just lam@(Lambda _ _) -> evalUserLambda env lam args
             _ -> Left "Exception: undefined function or invalid call"
-evalCall _ s _ = Left "Exception: invalid call"
+evalCall _ _ _ = Left "Exception: invalid call"
 
 evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Either String AstResult
 evalLambdaApp env params body args = do

@@ -14,4 +14,5 @@ printAst (Atom n) = show n
 printAst (Symbol s) = s
 printAst (ABool True) = "#t"
 printAst (ABool False) = "#f"
+printAst (List xs) = "(" ++ unwords (map printAst xs) ++ ")"
 printAst ast = show ast
