@@ -1,0 +1,13 @@
+FROM fedora:latest as builder
+
+WORKDIR /app/fedora
+COPY ../ /app/fedora
+
+RUN dnf -y update && \
+    dnf -y install make cabal-install curl gcc gcc-c++ && \
+    curl -sSL https://get.haskellstack.org/ | sh && \
+    dnf clean all
+
+RUN make build
+
+RUN mkdir -p /dist && cp ./glados /dist/glados

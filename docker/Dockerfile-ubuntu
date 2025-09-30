@@ -1,0 +1,12 @@
+FROM ubuntu:latest as builder
+
+WORKDIR /app/ubuntu
+COPY ../ /app/ubuntu
+
+RUN apt-get update && \
+    apt-get install -y curl make cabal-install gcc g++ && \
+    curl -sSL https://get.haskellstack.org/ | sh
+
+RUN make build
+
+RUN mkdir -p /dist && cp ./glados /dist/glados

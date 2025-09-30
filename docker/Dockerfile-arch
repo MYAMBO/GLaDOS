@@ -1,0 +1,11 @@
+FROM archlinux:latest as builder
+
+WORKDIR /app/arch
+COPY ../ /app/arch
+
+RUN pacman -Syu --noconfirm && \
+    pacman -Sy --noconfirm base-devel curl stack cabal-install
+
+RUN make build
+
+RUN mkdir -p /dist && cp ./glados /dist/glados
