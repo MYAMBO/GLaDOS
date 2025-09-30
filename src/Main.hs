@@ -64,10 +64,10 @@ repl env = do
                     repl env
                 Just ast ->
                     case eval env ast of
-                        Nothing -> do
-                            putStrLn "Evaluation error"
+                        Left err -> do
+                            putStrLn err
                             repl env
-                        Just (result, newEnv) -> do
+                        Right (result, newEnv) -> do
                             printResult result
                             repl newEnv
 

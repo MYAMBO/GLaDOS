@@ -9,6 +9,7 @@ module Interpret where
 
 import Control.Applicative ((<|>))
 import Tools hiding (evalInt)
+import Data.Either()
 import DataStored
 
 evalSymbols :: Env -> String -> [Ast] -> Maybe Ast
@@ -21,39 +22,46 @@ evalSymbols env s args =
     (evalCar env s args)        <|>     (evalNull env s args)     <|>
     (evalCdr env s args)
 
+eitherToMaybe :: Either e a -> Maybe a
+eitherToMaybe (Right x) = Just x
+eitherToMaybe _         = Nothing
+
 evalMore :: Env -> String -> [Ast] -> Maybe Ast
 evalMore env "+" args =
     fmap (Atom . sum) (traverse (evalInt env) args)
     where
-        evalInt e ast = do
-            (Just (Atom n), _) <- eval e ast
-            Just n
+        evalInt e ast =
+            case eval e ast of
+                Right ( Just (Atom n), _) -> Just n
+                _ -> Nothing
 evalMore _ _ _ = Nothing
 
 evalNull :: Env -> String -> [Ast] -> Maybe Ast
 evalNull env "null?" [arg] = do
-    lst <- eval env arg >>= fst
-    return $ case lst of
-        List [] -> ABool True
-        _       -> ABool False
+    (mval, _) <- eitherToMaybe (eval env arg)
+    case mval of
+        Just (List []) -> Just (ABool True)
+        Just (List _)  -> Just (ABool False)
+        _              -> Nothing
 evalNull _ _ _ = Nothing
+
 
 evalCdr :: Env -> String -> [Ast] -> Maybe Ast
 evalCdr env "cdr" [arg] = do
-    (Just (List (_:xs)), _) <- eval env arg
+    (Just (List (_:xs)), _) <- eitherToMaybe (eval env arg)
     Just $ List xs
 evalCdr _ _ _ = Nothing
 
 evalCar :: Env -> String -> [Ast] -> Maybe Ast
 evalCar env "car" [arg] = do
-    List (x:_) <- eval env arg >>= fst
+    List (x:_) <- eitherToMaybe (eval env arg) >>= fst
     return x
 evalCar _ _ _ = Nothing
 
 evalCons :: Env -> String -> [Ast] -> Maybe Ast
 evalCons env "cons" [element, listToPrepend] = do
-    List xs <- eval env listToPrepend >>= fst
-    x <- eval env element >>= fst
+    List xs <- eitherToMaybe (eval env listToPrepend) >>= fst
+    x <- eitherToMaybe (eval env element) >>= fst
     return $ List (x : xs)
 evalCons _ _ _ = Nothing
 
@@ -62,7 +70,7 @@ evalListFunc env "list" args = fmap List (traverse evalArg args)
   where
     evalArg :: Ast -> Maybe Ast
     evalArg ast = do
-        (res, _) <- eval env ast
+        (res, _) <- eitherToMaybe (eval env ast)
         res
 evalListFunc _ _ _ = Nothing
 
@@ -70,18 +78,20 @@ evalLess :: Env -> String -> [Ast] -> Maybe Ast
 evalLess env "-" args = do
     fmap (Atom . foldl1 (-)) (traverse (evalInt env) args)
     where
-        evalInt e ast = do
-            (Just (Atom n), _) <- eval e ast
-            Just n
+        evalInt e ast =
+            case eval e ast of
+                Right ( Just (Atom n), _) -> Just n
+                _ -> Nothing
 evalLess _ _ _ = Nothing
 
 evalMultiply :: Env -> String -> [Ast] -> Maybe Ast
 evalMultiply env "*" args = do
     fmap (Atom . product) (traverse (evalInt env) args)
     where
-        evalInt e ast = do
-            (Just (Atom n), _) <- eval e ast
-            Just n
+        evalInt e ast =
+            case eval e ast of
+                Right ( Just (Atom n), _) -> Just n
+                _ -> Nothing
 evalMultiply _ _ _ = Nothing
 
 evalDivide :: Env -> String -> [Ast] -> Maybe Ast
@@ -90,9 +100,10 @@ evalDivide env "div" args = do
     ints <- traverse (evalInt env) args
     return $ Atom (foldl1 safeDiv ints)
   where
-    evalInt e ast = do
-        (Just (Atom n), _) <- eval e ast
-        Just n
+    evalInt e ast =
+            case eval e ast of
+                Right ( Just (Atom n), _) -> Just n
+                _ -> Nothing
 evalDivide _ _ _ = Nothing
 
 evalModulo :: Env -> String -> [Ast] -> Maybe Ast
@@ -101,9 +112,10 @@ evalModulo env "mod" args = do
     ints <- traverse (evalInt env) args
     return $ Atom (foldl1 safeMod ints)
   where
-    evalInt e ast = do
-        (Just (Atom n), _) <- eval e ast
-        Just n
+    evalInt e ast =
+            case eval e ast of
+                Right ( Just (Atom n), _) -> Just n
+                _ -> Nothing
 evalModulo _ _ _ = Nothing
 
 
@@ -113,9 +125,10 @@ evalGreater env ">" args = do
     list <- (traverse (evalInt env) args)
     Just (ABool (and [x > y | (x, y) <- zip list (drop 1 list)]))
   where
-    evalInt e ast = do
-        (Just (Atom n), _) <- eval e ast
-        Just n
+    evalInt e ast =
+            case eval e ast of
+                Right ( Just (Atom n), _) -> Just n
+                _ -> Nothing
 evalGreater _ _ _ = Nothing
 
 evalSmaller :: Env -> String -> [Ast] -> Maybe Ast
@@ -124,101 +137,80 @@ evalSmaller env "<" args = do
     list <- (traverse (evalInt env) args)
     Just (ABool (and [x < y | (x, y) <- zip list (drop 1 list)]))
   where
-    evalInt e ast = do
-        (Just (Atom n), _) <- eval e ast
-        Just n
+    evalInt e ast =
+            case eval e ast of
+                Right ( Just (Atom n), _) -> Just n
+                _ -> Nothing
 evalSmaller _ _ _ = Nothing
 
 evalEquality :: Env -> String -> [Ast] -> Maybe Ast
 evalEquality env "eq?" [a, b] = do
-    (va, _) <- eval env a
-    (vb, _) <- eval env b
-    Just (ABool (va == vb))
+        (va, _) <- eitherToMaybe (eval env a)
+        (vb, _) <- eitherToMaybe (eval env b)
+        Just (ABool (va == vb))
 evalEquality _ _ _ = Nothing
 
-evalAtom :: Env -> Ast -> Maybe AstResult
-evalAtom env (Atom n) = Just (Just (Atom n), env)
-evalAtom env (Symbol s) = do
-    v <- lookupVar s env
-    Just (Just (v), env)
-evalAtom _ _  = Nothing
-
-evalDefine :: Env -> String -> Ast -> Maybe AstResult
+evalDefine :: Env -> String -> Ast -> Either String AstResult
 evalDefine env name expr = do
     (val, _) <- eval env expr
     case val of
-        Just v  -> Just (Nothing, (name, v) : env)
-        Nothing -> Nothing
+        Just v  -> Right (Nothing, (name, v) : env)
+        Nothing -> Left "Exception: invalid syntax"
 
-evalArgs :: Env -> [String] -> [Ast] -> Maybe AstResult
-evalArgs env params args = do
-    if length params /= length args
-        then Nothing
-        else do
-            _ <- mapM (\arg -> do
-                (mVal, _) <- eval env arg
-                case mVal of
-                    Just val -> return val
-                    Nothing -> fail "Evaluation failed") args
-            Just (Just (Symbol "ok"), env)
-
-evalBuiltinCall :: Env -> String -> [Ast] -> Maybe AstResult
-evalBuiltinCall env s args = 
+evalBuiltinCall :: Env -> String -> [Ast] -> Either String AstResult
+evalBuiltinCall env s args = do
     case evalSymbols env s args of
-        Just result -> Just (Just result, env)
-        Nothing     -> Nothing
+        Just result -> Right (Just result, env)
+        Nothing     -> Left "Exception: unknown Symbol"
 
-evalUserLambda :: Env -> Ast -> [Ast] -> Maybe AstResult
+evalUserLambda :: Env -> Ast -> [Ast] -> Either String AstResult
 evalUserLambda env (Lambda params body) args
-    | length params /= length args = Nothing
+    | length params /= length args = Left "Exception: wrong number of parameter"
     | otherwise = do
         evaledArgs <- mapM (\arg -> do
             (mVal, _) <- eval env arg
             case mVal of
                 Just val -> return val
-                Nothing -> fail "Evaluation failed") args
+                Nothing -> Left "Evaluation failed") args
         let localEnv = zip params evaledArgs ++ env
         (res, _) <- eval localEnv body
-        return (res, env)
-evalUserLambda _ _ _ = Nothing
+        Right (res, env)
+evalUserLambda _ _ _ = Left "Exception: evalUserLambda"
 
-evalCall :: Env -> Ast -> [Ast] -> Maybe AstResult
+evalCall :: Env -> Ast -> [Ast] -> Either String AstResult
 evalCall env (Symbol s) args =
     case evalBuiltinCall env s args of
-        Just result -> Just result
-        Nothing -> do
-            func <- lookupVar s env
-            case func of
-                lam@(Lambda _ _) -> evalUserLambda env lam args
-                _ -> Nothing
-evalCall _ _ _ = Nothing
+        Right result -> Right result
+        Left _ -> case lookupVar s env of
+            Just lam@(Lambda _ _) -> evalUserLambda env lam args
+            _ -> Left "Exception: undefined function or invalid call"
+evalCall _ _ _ = Left "Exception: invalid call"
 
-evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Maybe AstResult
+evalLambdaApp :: Env -> [String] -> Ast -> [Ast] -> Either String AstResult
 evalLambdaApp env params body args = do
     if length params /= length args
-        then Nothing
+        then Left "Exception: wong number of parameter"
         else do
             evaledArgs <- mapM (\arg -> do
                 (mVal, _) <- eval env arg
                 case mVal of
                     Just val -> return val
-                    Nothing -> fail "Evaluation failed") args
+                    Nothing -> Left "Evaluation failed") args
             let localEnv = zip params evaledArgs ++ env
             (res, _) <- eval localEnv body
-            return (res, env)
+            Right (res, env)
 
-evalSymbolApp :: Env -> String -> [Ast] -> Maybe AstResult
+evalSymbolApp :: Env -> String -> [Ast] -> Either String AstResult
 evalSymbolApp env s args = do
     case evalSymbols env s args of
-        Just result -> Just (Just (result), env)
-        Nothing -> do
-            func <- lookupVar s env
-            case func of
-                Lambda params body -> evalLambdaApp env params body args
-                _ -> Nothing
+        Just result -> Right (Just (result), env)
+        Nothing ->
+            case lookupVar s env of
+                Just (Lambda params body) -> evalLambdaApp env params body args
+                _ -> Left "Exception: evalSymbolApp"
 
-evalList :: Env -> [Ast] -> Maybe AstResult
-evalList env [] = Just (Just (List []), env)
+evalList :: Env -> [Ast] -> Either String AstResult
+evalList env [] = Right (Just (List []), env)
 evalList env [x] = eval env x
 evalList env (Symbol s : args) = evalSymbolApp env s args
 evalList env (Lambda params body : args) = evalLambdaApp env params body args
@@ -226,16 +218,20 @@ evalList env (x:xs) = do
     (_, env1) <- eval env x
     evalList env1 xs
 
-eval :: Env -> Ast -> Maybe AstResult
-eval env (Atom n)     = Just (Just (Atom n), env)
-eval env (Symbol s)   = do
-    v <- lookupVar s env
-    Just (Just v, env)
+eval :: Env -> Ast -> Either String AstResult
+eval env (Atom n)       = Right (Just (Atom n), env)
+eval env (Symbol s)     = do
+    v <- maybeToEither ("unbound variable: " ++ s) (lookupVar s env)
+    Right (Just v, env)
 eval env (Define var b) = evalDefine env var b
-eval env (List xs)    = evalList env xs
-eval env (ABool b)    = Just (Just (ABool b), env)
-eval env (If cond t f) = do
-    (Just (ABool c), env1) <- eval env cond
-    if c then eval env1 t else eval env1 f
-eval env (Call f args) = evalCall env f args
-eval env (Lambda p body) = Just (Just (Lambda p body), env)
+eval env (List xs)      = evalList env xs
+eval env (ABool b)      = Right (Just (ABool b), env)
+eval env (If cond t f)  = do
+    (mVal, env1) <- eval env cond
+    case mVal of
+        Just (ABool c) ->
+            if c then eval env1 t else eval env1 f
+        _ -> Left "Exception: invalid condition in if"
+eval env (Call f args)  = evalCall env f args
+eval env (Lambda p body)= Right (Just (Lambda p body), env)
+

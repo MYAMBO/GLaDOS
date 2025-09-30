@@ -22,3 +22,8 @@ safeDiv x y = div x y
 safeMod :: Int -> Int -> Int
 safeMod _ 0 = error "Modulo by zero"
 safeMod x y = mod x y
+
+maybeToEither :: e -> Maybe a -> Either e a
+maybeToEither err Nothing  = Left err
+maybeToEither _   (Just x) = Right x
+
