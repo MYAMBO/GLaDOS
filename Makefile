@@ -24,6 +24,7 @@ run: build
 clean:
 	@echo "Cleaning project..."
 	@$(STACK) clean
+	@rm bin/glados-*
 
 fclean: clean
 	@echo "Removing generated files..."

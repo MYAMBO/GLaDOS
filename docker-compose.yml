@@ -1,0 +1,39 @@
+services:
+  build-ubuntu:
+    container_name: glados-build-ubuntu
+    image: glados-build-ubuntu:latest
+    build:
+      context: .
+      dockerfile: "./docker/Dockerfile-ubuntu"
+      network: default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    tmpfs:
+      - /tmp:size=6g
+
+  build-arch:
+    container_name: glados-build-arch
+    image: glados-build-arch:latest
+    build:
+      context: .
+      dockerfile: "./docker/Dockerfile-arch"
+      network: default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    tmpfs:
+      - /tmp:size=6g
+
+  build-fedora:
+    container_name: glados-build-fedora
+    image: glados-build-fedora:latest
+    build:
+      context: .
+      dockerfile: "./docker/Dockerfile-fedora"
+      network: default
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    tmpfs:
+      - /tmp:size=6g

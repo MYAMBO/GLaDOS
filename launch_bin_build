@@ -1,0 +1,15 @@
+#!/bin/bash
+
+docker-compose build
+
+docker create --name ubuntu-export glados-build-ubuntu
+docker cp ubuntu-export:/dist/glados ./bin/glados-ubuntu
+docker rm ubuntu-export
+
+docker create --name arch-export glados-build-arch
+docker cp arch-export:/dist/glados ./bin/glados-arch
+docker rm arch-export
+
+docker create --name fedora-export glados-build-fedora
+docker cp fedora-export:/dist/glados ./bin/glados-fedora
+docker rm fedora-export
