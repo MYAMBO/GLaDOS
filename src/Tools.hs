@@ -27,3 +27,8 @@ maybeToEither :: e -> Maybe a -> Either e a
 maybeToEither err Nothing  = Left err
 maybeToEither _   (Just x) = Right x
 
+eitherToMaybe :: Either e a -> Maybe a
+eitherToMaybe x =
+    case x of
+        Right v -> Just v
+        _       -> Nothing
