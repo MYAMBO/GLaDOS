@@ -136,5 +136,3 @@ tests = testGroup "ParseSExpr tests"
           runParser parseSExpr "0" @?= Just (SAtom 0, "")
       ]
   ]
-
-
