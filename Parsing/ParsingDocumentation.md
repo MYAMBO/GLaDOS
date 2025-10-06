@@ -1,23 +1,23 @@
-# Documentation du module Parsing
+# Parsing Module Documentation
 
-Ce document décrit le fonctionnement du module `Parsing`, qui fournit une implémentation personnalisée de parseurs à l'aide des classes `Functor`, `Applicative`, `Alternative` et `Monad`.
+This document describes the functionality of the `Parsing` module, which provides a custom parser implementation using the `Functor`, `Applicative`, `Alternative`, and `Monad` typeclasses.
 
 ---
 
-## 📊 Types de base
+## 📊 Basic Types
 
 ### `type ParserType a = String -> Maybe (a, String)`
-Une fonction qui prend une chaîne de caractères et retourne, si réussi, une valeur de type `a` et le reste de la chaîne non consommée.
+A function that takes a string and returns, upon success, a value of type `a` and the rest of the unconsumed string.
 
 ### `data Parser a = Parser { runParser :: String -> Maybe (a, String) }`
-Le type principal. Représente un parseur d'éléments de type `a`.
+The main type. Represents a parser for elements of type `a`.
 
 ---
 
-## 🔧 Fonctions de base
+## 🔧 Core Functions
 
 ### `fmapParser`
-Applique une fonction au résultat retourné par un parseur.
+Applies a function to the result returned by a parser.
 
 ```haskell
 runParser (fmap (+1) (pure 3)) "abc"  -- Just (4, "abc")
@@ -26,35 +26,33 @@ runParser ((+1) <$> (pure 3)) "abc"  -- Just (4, "abc")
 ```
 
 ### `pureParser`
-Crée un parseur qui retourne une valeur sans consommer la chaîne.
+Creates a parser that returns a value without consuming the string.
 
 ```haskell
-runParser (pureParser 5) "hello" -- Just (5, "hello")
-```
+runParser (pureParser 5) "hello" -- Just (5, "hello")```
 
 ### `appParser`
-Applique un parseur de fonction à un parseur de valeur.
+Applies a function parser to a value parser.
 
 ```haskell
 runParser ((pure (*2)) <*> pure 4) "abc" -- Just (8, "abc")
 ```
 
 ### `emptyParser`
-Un parseur qui échoue toujours.
+A parser that always fails.
 
 ```haskell
-runParser emptyParser "test" -- Nothing
-```
+runParser emptyParser "test" -- Nothing```
 
 ### `altParser`
-Essaye le premier parseur, si échec, essaye le deuxième.
+Tries the first parser, and if it fails, tries the second one.
 
 ```haskell
 runParser (parseChar 'a' <|> parseChar 'b') "abc" -- Just ('a', "bc")
 ```
 
 ### `monadParser`
-Permet d'enchaîner deux parseurs.
+Allows for chaining two parsers.
 
 ```haskell
 parseTuple p = do
@@ -68,38 +66,38 @@ parseTuple p = do
 
 ---
 
-## 🔍 Parseurs simples
+## 🔍 Simple Parsers
 
 ### `parseChar :: Char -> Parser Char`
-Parse un caractère exact.
+Parses an exact character.
 
 ```haskell
 runParser (parseChar 'a') "abc" -- Just ('a', "bc")
 ```
 
 ### `parseOneChar :: Parser Char`
-Parse un seul caractère, quel qu’il soit.
+Parses a single character, whatever it may be.
 
 ```haskell
 runParser parseOneChar "abc" -- Just ('a', "bc")
 ```
 
 ### `parseString :: String -> Parser String`
-Parse une chaîne de caractères exacte.
+Parses an exact string.
 
 ```haskell
 runParser (parseString "hello") "hello world" -- Just ("hello", " world")
 ```
 
 ### `parseAnyChar :: String -> Parser Char`
-Parse un caractère parmi ceux donnés.
+Parses one character from a given set of characters.
 
 ```haskell
 runParser (parseAnyChar "abc") "bcd" -- Just ('b', "cd")
 ```
 
 ### `tryMaybe :: Parser a -> Parser (Maybe a)`
-Tente un parseur, retourne `Nothing` si échec, sans erreur.
+Tries a parser, returns `Nothing` on failure, without causing an error.
 
 ```haskell
 runParser (tryMaybe (parseChar 'x')) "xyz" -- Just (Just 'x', "yz")
@@ -109,10 +107,10 @@ runParser (tryMaybe (parseChar 'x')) "abc" -- Just (Nothing, "abc")
 
 ---
 
-## ♻️ Répétitions
+## ♻️ Repetition
 
 ### `parseMany`, `parseSome`
-Répète un parseur jusqu'à échec, parseMany ne peut jamais échouer, parseSome échoue si le premier passage du parseur échoue
+Repeats a parser until failure. `parseMany` can never fail (it can return an empty list), while `parseSome` fails if the first run of the parser fails.
 
 ```haskell
 runParser (parseMany (parseChar 'a')) "aaabbb" -- Just ("aaa", "bbb")
@@ -120,17 +118,17 @@ runParser (parseMany (parseChar 'a')) "aaabbb" -- Just ("aaa", "bbb")
 
 ---
 
-## 📊 Entiers
+## 📊 Integers
 
 ### `parseUInt :: Parser Int`
-Parse un entier non signé.
+Parses an unsigned integer.
 
 ```haskell
 runParser parseUInt "42abc" -- Just (42, "abc")
 ```
 
 ### `parseInt :: Parser Int`
-Parse un entier qui peut être signé.
+Parses an integer that can be signed.
 
 ```haskell
 runParser parseInt "-42abc" -- Just (-42, "abc")
@@ -143,14 +141,14 @@ runParser parseInt "15xyz" -- Just (15, "xyz")
 ## ⚖️ Structures
 
 ### `parseTuple :: Parser a -> Parser (a, a)`
-Parse une paire entre parenthèses, séparé par une virgule, sans espace.
+Parses a pair enclosed in parentheses, separated by a comma, with no spaces.
 
 ```haskell
 runParser (parseTuple parseInt) "(-1,42)abc" -- Just ((-1,42), "abc")
 ```
 
 ### `parseTruple :: Parser (Int, Int, Int)`
-Parse un triplet d'entiers, séparé par une virgule, sans espace.
+Parses a triplet of integers, separated by a comma, with no spaces.
 
 ```haskell
 runParser parseTruple "(1,2,3)" -- Just ((1,2,3), "")
@@ -158,11 +156,11 @@ runParser parseTruple "(1,2,3)" -- Just ((1,2,3), "")
 
 ---
 
-## ⚖️ Fonctions personnalisées
+## ⚖️ Custom Functions
 
 ### `parseWhile :: Int -> String -> Parser String`
-Parse tous les caractères jusqu'à une chaîne de fin donnée (sans consommer celle-ci).
-Prends un Int en paramètre qui définit le nombre de délimiteurs à passer avant d'arrêter le parseWhile. -1 pour s'arrêter au dernier.
+Parses all characters up to a given end string (without consuming it).
+Takes an `Int` as a parameter that defines the number of delimiters to pass before stopping. Use `-1` to stop at the last delimiter.
 
 ```haskell
 runParser (parseWhile 2 "]") "abc]x]yz" -- Just ("abc]x", "yz")
@@ -171,17 +169,17 @@ runParser (parseWhile 1 "}-") "abc}-xyz" -- Just ("abc", "}-xyz")
 ```
 
 ### `parseBetween :: Int -> String -> String -> Parser String`
-Parse une chaîne entre deux délimiteurs donnés.
-Prends un Int, même fonctionnement que parseWhile pour le délimiteur de fin.
+Parses a string between two given delimiters.
+Takes an `Int` that works the same way as in `parseWhile` for the end delimiter.
 
 ```haskell
-runParser (parseBetween "[" "]") "[hello]world" -- Just ("hello", "world")
+runParser (parseBetween 1 "[" "]") "[hello]world" -- Just ("hello", "world")
 
-runParser (parseBetween "-{" "}-") "-{hello}-world" -- Just ("hello", "world")
+runParser (parseBetween 1 "-{" "}-") "-{hello}-world" -- Just ("hello", "world")
 ```
 
 ### `parseAnyCharExcept :: String -> Parser String`
-Parse tous les caractères tant qu’ils ne sont pas dans une liste d’interdits.
+Parses all characters as long as they are not in a list of forbidden characters.
 
 ```haskell
 runParser (parseAnyCharExcept "c") "abcde" -- Just ("ab", "cde")
@@ -190,12 +188,10 @@ runParser (parseAnyCharExcept "tdy") "abcde" -- Just ("abc", "de")
 ```
 
 ### `parseWithoutConsum :: Parser a -> Parser String`
-Lance un parser mais ne consume pas la partie parsé en cas de réussite.
+Runs a parser but does not consume the parsed part on success.
 
 ```haskell
 runParser (parseWithoutConsum (parseString "hello")) "hello world" -- Just ("", "hello world")
 
 runParser (parseWithoutConsum (parseString "hello")) "not hello world" -- Nothing
 ```
-
----
