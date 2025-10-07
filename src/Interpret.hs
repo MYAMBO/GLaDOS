@@ -60,7 +60,7 @@ evalDivide _ "div" args | length args < 2 =
     Just (Left "Exception: (div) not enough argument")
 evalDivide env "div" args = do
         ints <- traverse (evalInt env) args
-        if any (== 0) (tail ints)
+        if any (== 0) (drop 1 ints)
             then Just (Left "Exception: division by zero")
             else return $ Right (Atom (foldl1 safeDiv ints))
   where
@@ -75,7 +75,7 @@ evalModulo :: Env -> String -> [Ast] -> Maybe (Either String Ast)
 evalModulo _ "mod" args | length args < 2 = Just (Left "Exception: (mod) not enough argument")
 evalModulo env "mod" args = do
     ints <- traverse (evalInt env) args
-    if any (== 0) (tail ints)
+    if any (== 0) (drop 1 ints)
         then Just (Left "Exception: modulo by zero")
         else return $ Right (Atom (foldl1 safeMod ints))
   where
