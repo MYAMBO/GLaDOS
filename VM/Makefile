@@ -13,10 +13,11 @@ all: build
 build:
 	@echo "Building GLaDOS VM..."
 	@$(STACK) install --local-bin-path "./"
+	@mv $(OUTPUT) ../$(OUTPUT)
 
 run: build
 	@echo "Running GLaDOS VM..."
-	@./$(OUTPUT) $(ARGS)
+	@../$(OUTPUT) $(ARGS)
 
 clean:
 	@echo "Cleaning GLaDOS VM project..."
@@ -24,7 +25,7 @@ clean:
 
 fclean: clean
 	@echo "Removing generated VM files..."
-	@rm -f $(OUTPUT)
+	@rm -f ../$(OUTPUT)
 	@rm -rf .stack-work
 
 re: fclean all

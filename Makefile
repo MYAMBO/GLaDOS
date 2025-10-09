@@ -10,8 +10,9 @@ EXECUTABLE = $(shell $(STACK) path --local-install-root)/bin/glados
 OUTPUT = ./glados
 TEST_DIR = test
 COVERAGE_DIR = $(TEST_DIR)/coverage
+VM_DIR = VM
 
-all: build
+all: build build_vm
 
 build:
 	@echo "Building Haskell project with Stack..."
@@ -44,3 +45,25 @@ xml_gen:
 	@stack test --test-arguments="--xml build/test-results/test/results.xml"
 
 re: fclean all
+
+
+
+VM_DIR = VM
+
+vm:
+	@$(MAKE) -C $(VM_DIR) all
+
+build_vm:
+	@$(MAKE) -C $(VM_DIR) build
+
+run_vm:
+	@$(MAKE) -C $(VM_DIR) run ARGS="$(ARGS)"
+
+clean_vm:
+	@$(MAKE) -C $(VM_DIR) clean
+
+fclean_vm:
+	@$(MAKE) -C $(VM_DIR) fclean
+
+re_vm:
+	@$(MAKE) -C $(VM_DIR) re
