@@ -8,9 +8,9 @@
 STACK = stack
 OUTPUT = glados-vm
 
-all: build
+all: $(OUTPUT)
 
-build:
+$(OUTPUT):
 	@echo "Building GLaDOS VM..."
 	@$(STACK) install --local-bin-path "./"
 	@mv $(OUTPUT) ../$(OUTPUT)
@@ -23,9 +23,9 @@ clean:
 	@echo "Cleaning GLaDOS VM project..."
 	@$(STACK) clean
 
-fclean: clean
+fclean:	clean
 	@echo "Removing generated VM files..."
 	@rm -f ../$(OUTPUT)
 	@rm -rf .stack-work
 
-re: fclean all
+re:	fclean all

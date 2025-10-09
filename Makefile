@@ -12,13 +12,13 @@ TEST_DIR = test
 COVERAGE_DIR = $(TEST_DIR)/coverage
 VM_DIR = VM
 
-all: build build_vm
+all: $(OUTPUT) build_vm
 
-build:
+$(OUTPUT):
 	@echo "Building Haskell project with Stack..."
 	@$(STACK) install --local-bin-path "./"
 
-run: build
+run: $(OUTPUT)
 	@echo "Running executable..."
 	@$(OUTPUT) -- $(ARGS)
 
@@ -45,6 +45,8 @@ xml_gen:
 	@stack test --test-arguments="--xml build/test-results/test/results.xml"
 
 re: fclean all
+
+.PHONY: clean fclean tests_run xml_gen re run
 
 
 
