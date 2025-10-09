@@ -51,12 +51,13 @@ re: fclean all
 
 
 VM_DIR = VM
+VM_OUTPUT = glados-vm
 
 vm:
 	@$(MAKE) -C $(VM_DIR) all
 
 build_vm:
-	@$(MAKE) -C $(VM_DIR) build
+	@$(MAKE) -C $(VM_DIR) $(glados-vm)
 
 run_vm:
 	@$(MAKE) -C $(VM_DIR) run ARGS="$(ARGS)"

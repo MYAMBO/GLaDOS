@@ -15,7 +15,7 @@ $(OUTPUT):
 	@$(STACK) install --local-bin-path "./"
 	@mv $(OUTPUT) ../$(OUTPUT)
 
-run: build
+run: $(OUTPUT)
 	@echo "Running GLaDOS VM..."
 	@../$(OUTPUT) $(ARGS)
 

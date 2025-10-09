@@ -29,7 +29,7 @@ parseAndExec path = do
 parseBytecodeFile :: Get (Env, Program)
 parseBytecodeFile = do
     magic <- getWord32be
-    when (magic /= 0x4D59564D) $ fail "Invalid Magic number"
+    when (magic /= 0x42414B41) $ fail "Invalid Magic number"
     _ <- getWord32be
     env <- getEnv
     mainProgram <- getProgram
