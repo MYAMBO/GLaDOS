@@ -50,7 +50,6 @@ re: fclean all
 
 
 
-VM_DIR = VM
 VM_OUTPUT = glados-vm
 
 vm:
