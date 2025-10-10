@@ -14,6 +14,20 @@ exec args env = exec' where
               newStack <- execCall argcount func env argsPopped deeperStack
               exec' program newStack
           [] -> Left "Error: Corrupted stack, function not found after arguments"
+  exec' (TailCall argcount:program) stack = do
+      when (length stack < argcount + 1) $
+          Left $ "Error: Call expects " ++ show argcount ++ " arguments and a function on the stack"
+      let (argsPopped, funcAndRest) = splitAt argcount stack
+      case funcAndRest of
+          (Func newProgram:deeperStack) -> do
+              when (length argsPopped /= argcount) $
+                  Left $ "Error: The function expects " ++ show argcount ++ " arguments, but received " ++ show (length args)
+              let newArgs = reverse argsPopped
+              exec newArgs env newProgram deeperStack
+          (Op op:deeperStack) ->
+              execCall argcount (Op op) env argsPopped deeperStack >>= \newStack -> exec' program newStack
+          (val:_) -> Left $ "Error: Attempted to call a non-functional value: " ++ show val
+          [] -> Left "Error: Corrupted stack, function not found after arguments"
   exec' (PushFromArgs n:program) stack = exec' program ((args !! n):stack)
   exec' (PushFromEnv s:program) stack = case lookup s env of
       Just v  -> exec' program (v:stack)
