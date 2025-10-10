@@ -21,7 +21,7 @@ exec args env = exec' where
       case funcAndRest of
           (Func newProgram:deeperStack) -> do
               when (length argsPopped /= argcount) $
-                  Left $ "Error: The function expects " ++ show argcount ++ " arguments, but received " ++ show (length args)
+                  Left $ "Error: The function expects " ++ show argcount ++ " arguments, but received " ++ show (length argsPopped)
               let newArgs = reverse argsPopped
               exec newArgs env newProgram deeperStack
           (Op op:deeperStack) ->
