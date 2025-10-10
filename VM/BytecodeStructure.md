@@ -109,7 +109,7 @@ Let's imagine a simple program: `add(10, 20)`.
 **Calling Convention:** To call a function, its arguments are pushed onto the stack *after* the function itself. The sequence is: `Push (Func ...)` -> `Push arg1` -> `Push arg2` -> `Call 2`.
 
 1.  **Header**:
-    *   Magic: `0x4D59564D`
+    *   Magic: `0x42414B41`
     *   Version: `0x00000001`
 
 2.  **Environment Section**:
