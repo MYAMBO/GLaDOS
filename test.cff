@@ -1,0 +1,21 @@
+// c'est un commentaire
+
+/*
+c'est aussi un commentaire
+*/
+
+func fact<int32 n> => int32
+case fact n < 0    -> -1
+case fact n == 0   -> 1
+case fact any      -> n + fact (n - 1)    // recursion
+
+
+Define "fact" (lambda ["n"]
+  (If (List [Symbol "<", Symbol "n", Int 0]
+    (Int -1)
+    (If (List [Symbol "==", Symbol "n", Int 0]
+      (Int 1)
+      (List [Symbol "+", Symbol "n", List [Symbol "fact", List [Symbol "-", Symbol "n", Int 1]]])
+    ))
+  ))
+)
