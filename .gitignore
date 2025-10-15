@@ -12,3 +12,4 @@ hpc*
 coverage.tix
 Main
 .idea
+*.bin
