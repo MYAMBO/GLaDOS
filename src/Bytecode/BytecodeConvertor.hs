@@ -94,6 +94,15 @@ bytecodeToInt8 :: BL.ByteString -> Int
 bytecodeToInt8 bs =
   fromIntegral (runGet getInt8 bs :: Int8)
 
+--------------- Bool / Bytecode -----------------------------------------------
+
+boolToBytecode :: Bool -> BL.ByteString
+boolToBytecode value =
+  BB.toLazyByteString (BB.word8 (fromIntegral (fromEnum value)))
+
+bytecodeToBool :: BL.ByteString -> Bool
+bytecodeToBool = (/= 0) . BL.head
+
 --------------- Char / Bytecode -----------------------------------------------
 
 -- Encode a Char as 1-byte ByteString
