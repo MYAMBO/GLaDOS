@@ -1,8 +1,7 @@
 {-
 -- EPITECH PROJECT, 2025
 -- GLaDOS
--- File description:
--- BytecodeParser
+-- File description-- BytecodeParser
 -}
 
 module BytecodeParser (parseAndExec) where
@@ -20,17 +19,18 @@ parseAndExec path = do
     case runGetOrFail parseBytecodeFile content of
         Left (_, _, errMsg) -> putStrLn $ "Parsing error : " ++ errMsg
         Right (_, _, (env, mainProgram)) -> do
---            putStrLn $ "Env: " ++ show env
---            putStrLn $ "Programme Principal: " ++ show mainProgram
+            -- For debugging, you can uncomment these lines:
+            -- putStrLn $ "Global Env: " ++ show env
+            -- putStrLn $ "Main Program: " ++ show mainProgram
             case exec [] env mainProgram [] of
-                Left err -> putStrLn $ err
+                Left err -> putStrLn err
                 Right val -> putStrLn $ show val
 
 parseBytecodeFile :: Get (Env, Program)
 parseBytecodeFile = do
     magic <- getWord32be
     when (magic /= 0x42414B41) $ fail "Invalid Magic number"
-    _ <- getWord32be
+    _ <- getWord32be -- Skip version number for now
     env <- getEnv
     mainProgram <- getProgram
     return (env, mainProgram)
@@ -68,6 +68,15 @@ getInstruction = getWord8 >>= \opcode -> case opcode of
         len <- fromIntegral <$> getWord32be
         strBytes <- getLazyByteString len
         return $ PushFromEnv (map (toEnum . fromIntegral) (B.unpack strBytes))
+    -- NEW: Add cases for Define and Assign instructions
+    0x0A -> do
+        len <- fromIntegral <$> getWord32be
+        strBytes <- getLazyByteString len
+        return $ Define (map (toEnum . fromIntegral) (B.unpack strBytes))
+    0x0B -> do
+        len <- fromIntegral <$> getWord32be
+        strBytes <- getLazyByteString len
+        return $ Assign (map (toEnum . fromIntegral) (B.unpack strBytes))
     _    -> fail $ "Unknown instruction : " ++ show opcode
 
 getVal :: Get Val
@@ -86,5 +95,6 @@ getOp = getWord8 >>= \opcode -> case opcode of
     0x04 -> return Div; 0x05 -> return Mod; 0x06 -> return Neg
     0x07 -> return Eq;  0x08 -> return Lt;  0x09 -> return Gt
     0x0A -> return Not; 0x0B -> return And; 0x0C -> return Or
-    0x0D -> return Xor
+    0x0D -> return Xor; 0x0E -> return Cons; 0x0F -> return Car
+    0x10 -> return Cdr; 0x11 -> return EmptyList
     _    -> fail $ "Unknown operation : " ++ show opcode
