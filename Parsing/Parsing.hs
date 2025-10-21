@@ -193,6 +193,27 @@ parseAnyCharExcept str = do
       return (c : str2)
       <|> return ""
 
+parseWhileOneOf :: [String] -> Parser String
+parseWhileOneOf [] = emptyParser
+parseWhileOneOf targets = Parser (parseWhileOneOfNext targets)
+  where
+    parseWhileOneOfNext ts input = go ts input ""
+    
+    go [] _ _ = Nothing
+    go ts inp acc = 
+      case findTargetAt ts inp of
+        Just _ -> Just (acc, inp)
+        Nothing -> 
+          case inp of
+            [] -> Nothing
+            (c:rest) -> go ts rest (acc ++ [c])
+    
+    findTargetAt [] _ = Nothing
+    findTargetAt (t:ts) inp = 
+      if take (length t) inp == t
+        then Just t
+        else findTargetAt ts inp
+
 parseWithoutConsumNext :: ParserType a -> ParserType String
 parseWithoutConsumNext p input | Just _ <- p input = Just ("", input)
 parseWithoutConsumNext _ _ = Nothing
