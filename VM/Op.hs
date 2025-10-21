@@ -1,9 +1,17 @@
+{-
+-- EPITECH PROJECT, 2025
+-- GLaDOS
+-- File description:
+-- Op
+-}
+
 module Op where
 
 data Val = Num Int
     | Bool Bool
     | Op Op
     | Func Program
+    | List [Val]
     deriving (Show, Eq)
 
 data Op = Add
@@ -19,6 +27,10 @@ data Op = Add
     | And
     | Or
     | Xor
+    | Cons
+    | Car
+    | Cdr
+    | EmptyList
     deriving (Show, Eq)
 
 data Instruction = Push Val
@@ -30,6 +42,8 @@ data Instruction = Push Val
     | TailCall ArgCount
     | PushFromArgs Int
     | PushFromEnv String
+    | Define String
+    | Assign String
     deriving (Show, Eq)
 
 type Stack = [Val]
