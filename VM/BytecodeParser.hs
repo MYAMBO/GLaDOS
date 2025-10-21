@@ -1,7 +1,7 @@
 {-
 -- EPITECH PROJECT, 2025
 -- GLaDOS
--- File description-- BytecodeParser
+-- File description: BytecodeParser
 -}
 
 module BytecodeParser (parseAndExec) where
