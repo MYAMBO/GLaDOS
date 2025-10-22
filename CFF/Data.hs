@@ -10,6 +10,38 @@ module CFF.Data where
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
 
+astFindType :: String -> VariableAst
+astFindType "Int32" = Int32 0
+astFindType "Int64" = Int64 0
+astFindType "Int16" = Int16 0
+astFindType "Int8"  = Int8 0
+astFindType "UInt32" = UInt32 0
+astFindType "UInt64" = UInt64 0
+astFindType "UInt16" = UInt16 0
+astFindType "UInt8"  = UInt8 0
+astFindType "Float" = Float 0.0
+astFindType "Double" = Double 0.0
+astFindType "Bool"  = Bool False
+astFindType "String" = String ""
+astFindType _       = String ""
+
+addValueToVar :: VariableAst -> String -> VariableAst
+addValueToVar (Int8 _) val = Int8 (read val :: Int8)
+addValueToVar (Int16 _) val = Int16 (read val :: Int16)
+addValueToVar (Int32 _) val = Int32 (read val :: Int32)
+addValueToVar (Int64 _) val = Int64 (read val :: Int64)
+addValueToVar (UInt8 _) val = UInt8 (read val :: Word8)
+addValueToVar (UInt16 _) val = UInt16 (read val :: Word16)
+addValueToVar (UInt32 _) val = UInt32 (read val :: Word32)
+addValueToVar (UInt64 _) val = UInt64 (read val :: Word64)
+addValueToVar (Float _) val = Float (read val :: Float)
+addValueToVar (Double _) val = Double (read val :: Double)
+addValueToVar (Bool _) val = Bool (read val :: Bool)
+addValueToVar (String _) val = String val
+
+removeSpaces :: String -> String
+removeSpaces = filter (`notElem` " \t")
+
 data VariableAst = Int8 Int8
                  | Int16 Int16
                  | Int32 Int32

@@ -12,10 +12,12 @@ import Parsing
 import Data.Maybe (fromMaybe)
 import Debug.Trace (trace)
 import Control.Applicative ((<|>))
+import CFF.Define
 
 main :: IO ()
 main = do
-    let input = "func fact<Int32 n, Int32 o> => Int32\n"
+    --let input = "func fact<Int32 n, Int32 o> => Int32\n"
+    let input = "define Double pi = 3.14159"
     let asts = parseAstLines input
     mapM_ print asts
 
@@ -34,8 +36,8 @@ toEither Nothing          = Left "Parse error"
 parseLine :: String -> Either String Ast
 parseLine line
     | "func" `elem` words line = toEither (runParser astConstrutor line)
-    | otherwise =
-        Left $ "Unknown line format: " ++ line
+    | "define" `elem` words line = toEither (runParser astDefine line)
+    | otherwise = Left $ "Unknown line format: " ++ line
 
 astArgumentsParser :: Parser [String]
 astArgumentsParser = do
@@ -58,21 +60,6 @@ astReturnTypeParser = do
   where
     trim :: String -> String
     trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
-
-astFindType :: String -> VariableAst
-astFindType "Int32" = Int32 0
-astFindType "Int64" = Int64 0
-astFindType "Int16" = Int16 0
-astFindType "Int8"  = Int8 0
-astFindType "UInt32" = UInt32 0
-astFindType "UInt64" = UInt64 0
-astFindType "UInt16" = UInt16 0
-astFindType "UInt8"  = UInt8 0
-astFindType "Float" = Float 0.0
-astFindType "Double" = Double 0.0
-astFindType "Bool"  = Bool False
-astFindType "String" = String ""
-astFindType _       = String ""
 
 astConstrutor :: Parser Ast
 astConstrutor = do
