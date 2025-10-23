@@ -17,6 +17,10 @@ $(OUTPUT):
 	@echo "Building Haskell project with Stack..."
 	@$(STACK) install --local-bin-path "./"
 
+build:
+	@echo "Building Haskell project with Stack..."
+	@$(STACK) install --local-bin-path "./"
+
 run: $(OUTPUT)
 	@echo "Running executable..."
 	@$(OUTPUT) -- $(ARGS)
