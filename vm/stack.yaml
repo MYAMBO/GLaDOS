@@ -1,9 +1,0 @@
-# Defines this directory as a standalone Stack project.
-# We use the same LTS (Long-Term Support) snapshot as your main project
-# for consistency.
-snapshot:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/10.yaml
-
-# Specifies that the package for this project is in the current directory.
-packages:
-- .
