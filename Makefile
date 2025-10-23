@@ -6,33 +6,14 @@
 ##
 
 STACK = stack
-EXECUTABLE = $(shell $(STACK) path --local-install-root)/bin/glados
-OUTPUT = ./glados
 TEST_DIR = test
 COVERAGE_DIR = $(TEST_DIR)/coverage
-VM_DIR = vm
-COMPILER_DIR = compiler
 
-all: $(OUTPUT) build_vm
+all:	build_vm build_compiler
 
-$(OUTPUT):
-	@echo "Building Haskell project with Stack..."
-	@$(STACK) install --local-bin-path "./"
+clean:	clean_vm clean_compiler
 
-run: $(OUTPUT)
-	@echo "Running executable..."
-	@$(OUTPUT) -- $(ARGS)
-
-clean:
-	@echo "Cleaning project..."
-	@$(STACK) clean
-
-fclean: clean
-	@echo "Removing generated files..."
-	@rm -rf .stack-work $(OUTPUT)
-	@rm -rf $(COVERAGE_DIR)/*
-	@rm -rf .hpc/
-	@rm -f report.xml
+fclean:	clean fclean_vm fclean_compiler
 
 tests_run:
 	@echo "Running tests..."
@@ -47,10 +28,7 @@ xml_gen:
 
 re: fclean all
 
-.PHONY: clean fclean tests_run xml_gen re run
-
-
-
+VM_DIR = vm
 VM_OUTPUT = glados-vm
 
 vm:
@@ -58,9 +36,6 @@ vm:
 
 build_vm:
 	@$(MAKE) -C $(VM_DIR) $(VM_OUTPUT)
-
-run_vm:
-	@$(MAKE) -C $(VM_DIR) run ARGS="$(ARGS)"
 
 clean_vm:
 	@$(MAKE) -C $(VM_DIR) clean
@@ -70,3 +45,22 @@ fclean_vm:
 
 re_vm:
 	@$(MAKE) -C $(VM_DIR) re
+
+
+COMPILER_DIR = compiler
+COMPILER_OUTPUT = glados-compiler
+
+compiler:
+	@$(MAKE) -C $(COMPILER_DIR) all
+
+build_compiler:
+	@$(MAKE) -C $(COMPILER_DIR) $(COMPILER_OUTPUT)
+
+clean_compiler:
+	@$(MAKE) -C $(COMPILER_DIR) clean
+
+fclean_compiler:
+	@$(MAKE) -C $(COMPILER_DIR) fclean
+
+re_compiler:
+	@$(MAKE) -C $(COMPILER_DIR) re

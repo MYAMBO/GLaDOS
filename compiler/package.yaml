@@ -1,14 +1,13 @@
-name: glados-vm
+name: glados-compiler
 version: 0.1.0.0
 
 dependencies:
   - base >= 4.7 && < 5
   - binary
   - bytestring
-  - containers
 
 executables:
-  glados-vm:
+  glados-compiler:
     main: Main.hs
     source-dirs: .
     ghc-options:
