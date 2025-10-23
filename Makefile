@@ -10,7 +10,8 @@ EXECUTABLE = $(shell $(STACK) path --local-install-root)/bin/glados
 OUTPUT = ./glados
 TEST_DIR = test
 COVERAGE_DIR = $(TEST_DIR)/coverage
-VM_DIR = VM
+VM_DIR = vm
+COMPILER_DIR = compiler
 
 all: $(OUTPUT) build_vm
 
