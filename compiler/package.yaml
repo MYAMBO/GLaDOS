@@ -1,0 +1,16 @@
+name: glados-compiler
+version: 0.1.0.0
+
+dependencies:
+  - base >= 4.7 && < 5
+  - binary
+  - bytestring
+
+executables:
+  glados-compiler:
+    main: Main.hs
+    source-dirs: .
+    ghc-options:
+      - -Wall
+      - -Wextra
+      - -threaded
