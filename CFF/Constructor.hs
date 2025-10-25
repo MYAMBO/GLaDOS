@@ -22,9 +22,12 @@ main = do
     let input = [
             "define Int32 m = 8",
             "func addm<Int32 o> => Int32",
+            "func addy<Int32 p> => Int32",
             "$ addm",
-            "    any + m o",
-            "define Int32 n = 10"
+            "    -> m + o",
+            "$ addy",
+            "    p == 1 -> p + 10\n",
+            "    p != 1 -> p + 20"
             ]
     let finalEnv = parseAllLines input []
     mapM_ print finalEnv
@@ -90,7 +93,7 @@ astConstrutor = do
   args <- astArgumentsParser
   _ <- parseWhile (-1) "=>"
   retType <- astReturnTypeParser
-  let argsAst = map (\arg -> let (t:n:_) = words arg in Var (astFindType t) (String n)) args
+  let argsAst = map (\arg -> let (t:n:_) = words arg in Var (astFindType t) n) args
   return (Define name (Lambda argsAst (Symbol retType) (Symbol "body")))
   where
     trim :: String -> String

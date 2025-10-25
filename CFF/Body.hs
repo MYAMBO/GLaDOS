@@ -31,7 +31,7 @@ parseBodyLine line =
     ("any":op:a:b:[]) ->
       BinOp (astFindOperation op) [Symbol a, Symbol b]
     (varType:name:value:[]) ->
-      Define name (Var (addValueToVar (astFindType varType) value) (String name))
+      Define name (Var (addValueToVar (astFindType varType) value) name)
     _ ->
       Symbol (trimLine line)
 

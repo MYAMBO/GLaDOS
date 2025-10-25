@@ -101,7 +101,8 @@ data Builtins = Equal
               | UnknownOp
   deriving (Show, Eq)
 
-data Ast = Var VariableAst VariableAst -- variable type and name
+data Ast = Var VariableAst String -- variable type and name
+         | Litteral VariableAst
          | List [Ast]
          | BinOp Builtins [Ast]
          | Define String Ast

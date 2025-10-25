@@ -36,7 +36,7 @@ astDefine = do
     let (varType, varName) = parseTypeAndName (lotSpaceToOne (trim typeAndName))
     value <- parseAnyCharExcept "\n"
     let cleanValue = removeSpaces value
-    return $ Define varName (Var (addValueToVar (astFindType varType) cleanValue) (String varName))
+    return $ Define varName (Var (addValueToVar (astFindType varType) cleanValue) varName)
   where
     trim :: String -> String
     trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
