@@ -10,6 +10,14 @@ module CFF.Data where
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
 
+toEither :: Maybe (Ast, String) -> Either String Ast
+toEither (Just (ast, _)) = Right ast
+toEither Nothing          = Left "Parse error"
+
+cleanCommentLine :: String -> String
+cleanCommentLine ('-':'-':rest) = dropWhile (== ' ') rest
+cleanCommentLine s = s
+
 astFindType :: String -> VariableAst
 astFindType "Int32" = Int32 0
 astFindType "Int64" = Int64 0
@@ -39,6 +47,24 @@ addValueToVar (Double _) val = Double (read val :: Double)
 addValueToVar (Bool _) val = Bool (read val :: Bool)
 addValueToVar (String _) val = String val
 
+astFindOperation :: String -> Builtins
+astFindOperation "==" = Equal
+astFindOperation "!=" = NotEqual
+astFindOperation "<"  = LessThan
+astFindOperation ">"  = GreaterThan
+astFindOperation "<=" = LessThanOrEqual
+astFindOperation ">=" = GreaterThanOrEqual
+astFindOperation "+"  = Add
+astFindOperation "-"  = Subtract
+astFindOperation "*"  = Multiply
+astFindOperation "/"  = Divide
+astFindOperation "%"  = Modulo
+astFindOperation "&&" = And
+astFindOperation "!"  = Not
+astFindOperation "||" = Or
+astFindOperation "^"  = Xor
+astFindOperation _    = UnknownOp
+
 removeSpaces :: String -> String
 removeSpaces = filter (`notElem` " \t")
 
@@ -67,11 +93,17 @@ data Builtins = Equal
               | Multiply
               | Divide
               | Modulo
+              | And
+              | Neg
+              | Or
+              | Not
+              | Xor
+              | UnknownOp
   deriving (Show, Eq)
 
 data Ast = Var VariableAst VariableAst -- variable type and name
          | List [Ast]
-         | BinOp Builtins Ast Ast
+         | BinOp Builtins [Ast]
          | Define String Ast
          | If Ast Ast Ast
          | Call Ast [Ast]
