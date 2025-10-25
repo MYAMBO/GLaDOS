@@ -190,5 +190,5 @@ execOp EmptyList stack = return $ List [] : stack
 
 -- Fallback for insufficient arguments or type mismatches
 execOp op []  = Left $ "Error: " ++ show op ++ " expects arguments, but the stack is empty."
-execOp op [_] = Left $ "Error: " ++ show op ++ " expects at least two arguments for a binary operation, or one for a unary one."
+execOp op [_] = Left $ "Error: Unexpected argument count for " ++ show op ++ ". This is a fallback for operations that do not match their expected patterns; most unary operations are handled above."
 execOp op _   = Left $ "Error: Type mismatch for operation " ++ show op
