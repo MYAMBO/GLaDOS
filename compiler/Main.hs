@@ -2,7 +2,7 @@
 -- EPITECH PROJECT, 2025
 -- GLaDOS
 -- File description:
--- Main
+-- VM Main
 -}
 
 module Main where

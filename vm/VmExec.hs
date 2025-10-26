@@ -187,3 +187,6 @@ execOp Cdr (List [] : _) = Left "Error: Cdr cannot be called on an empty list"
 execOp EmptyList stack = return $ List [] : stack
 
 execOp op stack = Left $ "Error: Invalid arguments on stack for operation " ++ show op ++ ". Stack: " ++ show (take 3 stack)
+execOp op []  = Left $ "Error: " ++ show op ++ " expects arguments, but the stack is empty."
+execOp op [_] = Left $ "Error: Unexpected argument count for " ++ show op ++ ". This is a fallback for operations that do not match their expected patterns; most unary operations are handled above."
+execOp op _   = Left $ "Error: Type mismatch for operation " ++ show op
