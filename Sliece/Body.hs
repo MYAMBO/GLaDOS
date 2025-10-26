@@ -5,11 +5,11 @@
 -- Body
 -}
 
-module CFF.Body where
+module Sliece.Body where
 
 import Parsing
-import CFF.Data
-import CFF.Tools
+import Sliece.Data
+import Sliece.Tools
 import Debug.Trace (trace)
 import Text.Read (readMaybe)
 import Control.Applicative ((<|>))
@@ -95,7 +95,9 @@ buildIfChain [] elseLines =
         [singleExpr] -> singleExpr
         exprs -> List exprs
 buildIfChain ((condStr, thenLines):restIfBlocks) finalElseLines =
-    let conditionAst = parseExpression condStr
+    let conditionAst = if null condStr
+                       then Litteral (Bool True)
+                       else parseExpression condStr
         thenAst = case map parseExpression thenLines of
                     [singleExpr] -> singleExpr
                     exprs -> List exprs

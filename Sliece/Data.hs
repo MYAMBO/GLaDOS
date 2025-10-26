@@ -5,9 +5,9 @@
 -- Data
 -}
 
-module CFF.Data where
+module Sliece.Data where
 
-import CFF.Tools (breakOn)
+import Sliece.Tools (breakOn)
 import Text.Read (readMaybe)
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
@@ -110,7 +110,7 @@ data Builtins = Equal
   deriving (Show, Eq)
 
 data Ast = Var VariableAst String -- variable type and name
-         | Litteral VariableAst   -- Changed from Literal to Litteral
+         | Litteral VariableAst
          | List [Ast]
          | BinOp Builtins [Ast]
          | Define String Ast

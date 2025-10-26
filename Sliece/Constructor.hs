@@ -5,13 +5,13 @@
 -- Constructor
 -}
 
-module CFF.Construtor where
+module Sliece.Construtor where
 
 import Parsing
-import CFF.Data
-import CFF.Body
-import CFF.Tools
-import CFF.Define
+import Sliece.Data
+import Sliece.Body
+import Sliece.Tools
+import Sliece.Define
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe, isJust)
 import Data.List (isPrefixOf)
@@ -57,9 +57,7 @@ parseAllLines (line:ls) env
 collectBodyLines :: [String] -> ([String], [String])
 collectBodyLines [] = ([], [])
 collectBodyLines (l:ls)
-  | isIndented l =
-    let (body, rest) = collectBodyLines ls
-    in (trimLine l : body, rest)
+  | isIndented l = let (body, rest) = collectBodyLines ls in (trimLine l : body, rest)
   | otherwise = ([], l:ls)
   where
     isIndented s = not (null s) && (head s == ' ' || head s == '\t')

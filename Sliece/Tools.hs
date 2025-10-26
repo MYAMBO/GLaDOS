@@ -5,7 +5,7 @@
 -- Tools
 -}
 
-module CFF.Tools where
+module Sliece.Tools where
 
 import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)

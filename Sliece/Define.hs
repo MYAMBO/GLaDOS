@@ -5,13 +5,13 @@
 -- Define
 -}
 
-module CFF.Define where
+module Sliece.Define where
 
-import CFF.Data
+import Sliece.Data
 import Parsing
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe)
-import CFF.Tools (lotSpaceToOne)
+import Sliece.Tools (lotSpaceToOne)
 import Control.Applicative ((<|>))
 
 parseTypeAndName :: String -> (String, String)
