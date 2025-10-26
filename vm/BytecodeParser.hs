@@ -17,11 +17,8 @@ parseAndExec :: FilePath -> IO ()
 parseAndExec path = do
     content <- B.readFile path
     case runGetOrFail parseBytecodeFile content of
-        Left (_, _, errMsg) -> putStrLn $ "Parsing error : " ++ errMsg
-        Right (_, _, (env, mainProgram)) -> do
-            -- For debugging, you can uncomment these lines:
-            -- putStrLn $ "Global Env: " ++ show env
-            -- putStrLn $ "Main Program: " ++ show mainProgram
+        Left (_, _, errMsg) -> putStrLn $ "Parsing error: " ++ errMsg
+        Right (_, _, (env, mainProgram)) ->
             case exec [] env mainProgram [] of
                 Left err -> putStrLn err
                 Right val -> putStrLn $ show val
@@ -45,7 +42,9 @@ getEnvEntry = do
     keyLen <- fromIntegral <$> getWord32be
     keyBytes <- getLazyByteString keyLen
     val <- getVal
-    return (map (toEnum . fromIntegral) (B.unpack keyBytes), val)
+    -- Convert lazy bytestring to a standard String
+    let key = map (toEnum . fromIntegral) (B.unpack keyBytes)
+    return (key, val)
 
 getProgram :: Get Program
 getProgram = do
@@ -64,30 +63,39 @@ getInstruction = getWord8 >>= \opcode -> case opcode of
     0x06 -> Call . fromIntegral <$> getWord32be
     0x07 -> TailCall . fromIntegral <$> getWord32be
     0x08 -> PushFromArgs . fromIntegral <$> getWord32be
-    0x09 -> do
+    0x09 -> PushFromEnv <$> getString
+    0x0A -> Define <$> getString
+    0x0B -> Assign <$> getString
+    _    -> fail $ "Unknown instruction: " ++ show opcode
+    where
+      getString = do
         len <- fromIntegral <$> getWord32be
         strBytes <- getLazyByteString len
-        return $ PushFromEnv (map (toEnum . fromIntegral) (B.unpack strBytes))
-    -- NEW: Add cases for Define and Assign instructions
-    0x0A -> do
-        len <- fromIntegral <$> getWord32be
-        strBytes <- getLazyByteString len
-        return $ Define (map (toEnum . fromIntegral) (B.unpack strBytes))
-    0x0B -> do
-        len <- fromIntegral <$> getWord32be
-        strBytes <- getLazyByteString len
-        return $ Assign (map (toEnum . fromIntegral) (B.unpack strBytes))
-    _    -> fail $ "Unknown instruction : " ++ show opcode
+        return $ map (toEnum . fromIntegral) (B.unpack strBytes)
+
 
 getVal :: Get Val
 getVal = getWord8 >>= \tag -> case tag of
-    0x01 -> Num . fromIntegral <$> getInt32be
-    0x02 -> Bool . (/= 0) <$> getWord8
-    0x03 -> Op <$> getOp
-    0x04 -> do
+    -- Structural types
+    0x01 -> BoolVal . (/= 0) <$> getWord8
+    0x02 -> Op <$> getOp
+    0x03 -> do
         instrCount <- getWord32be
         Func <$> replicateM (fromIntegral instrCount) getInstruction
-    _    -> fail $ "Value type not known : " ++ show tag
+    -- Signed integer types
+    0x10 -> Int8Val <$> getInt8
+    0x11 -> Int16Val <$> getInt16be
+    0x12 -> Int32Val <$> getInt32be
+    0x13 -> Int64Val <$> getInt64be
+    -- Unsigned integer types
+    0x20 -> Word8Val <$> getWord8
+    0x21 -> Word16Val <$> getWord16be
+    0x22 -> Word32Val <$> getWord32be
+    0x23 -> Word64Val <$> getWord64be
+    -- Floating-point types
+    0x30 -> FltVal <$> getFloatbe
+    0x31 -> DblVal <$> getDoublebe
+    _    -> fail $ "Unknown value type tag: " ++ show tag
 
 getOp :: Get Op
 getOp = getWord8 >>= \opcode -> case opcode of
@@ -97,4 +105,4 @@ getOp = getWord8 >>= \opcode -> case opcode of
     0x0A -> return Not; 0x0B -> return And; 0x0C -> return Or
     0x0D -> return Xor; 0x0E -> return Cons; 0x0F -> return Car
     0x10 -> return Cdr; 0x11 -> return EmptyList
-    _    -> fail $ "Unknown operation : " ++ show opcode
+    _    -> fail $ "Unknown operation: " ++ show opcode
