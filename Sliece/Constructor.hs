@@ -11,6 +11,7 @@ import Parsing
 import Sliece.Data
 import Sliece.Body
 import Sliece.Tools
+import Sliece.Parse
 import Sliece.Define
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe, isJust)
@@ -21,18 +22,10 @@ type Env = [Ast]
 
 main :: IO ()
 main = do
-    let input = [
-            "define Int32 m = 8",
-            "func addm<Int32 o> => Int32",
-            "func addy<Int32 p> => Int32",
-            "$ addm",
-            "    -> m + o",
-            "$ addy",
-            "    p == 2 -> p + 10",
-            "    p != 1 -> p + 20"
-            ]
-    let finalEnv = parseAllLines input []
-    mapM_ print finalEnv
+  mres <- parse
+  let input = maybe [] fst mres
+      finalEnv = parseAllLines input []
+  mapM_ print finalEnv
 
 parseAllLines :: [String] -> Env -> Env
 parseAllLines [] env = env
@@ -60,7 +53,9 @@ collectBodyLines (l:ls)
   | isIndented l = let (body, rest) = collectBodyLines ls in (trimLine l : body, rest)
   | otherwise = ([], l:ls)
   where
-    isIndented s = not (null s) && (head s == ' ' || head s == '\t')
+    isIndented s = case s of
+      (c:_) -> c == ' ' || c == '\t'
+      _ -> False
 
 astArgumentsParser :: Parser [String]
 astArgumentsParser = do

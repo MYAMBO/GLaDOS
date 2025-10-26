@@ -103,4 +103,19 @@ tests = testGroup "Parsing tests"
       , testCase "fail" $
           runParser (parseWithoutConsum (parseString "hello")) "not hello word" @?= Nothing
       ]
+
+  , testGroup "parseWhileOneOf"
+      [ testCase "parse until func found" $
+          runParser (parseWhileOneOf ["int32", "func"]) "   \n   \t func ... int32" @?= Just ("   \n   \t ", "func ... int32")
+      , testCase "parse until int32 found" $
+          runParser (parseWhileOneOf ["int32", "func"]) "hello world int32 rest" @?= Just ("hello world ", "int32 rest")
+      , testCase "parse until first target found" $
+          runParser (parseWhileOneOf ["def", "abc"]) "xyz abc def" @?= Just ("xyz ", "abc def")
+      , testCase "no target found, parse entire string" $
+          runParser (parseWhileOneOf ["missing"]) "hello world" @?= Nothing
+      , testCase "target at beginning" $
+          runParser (parseWhileOneOf ["hello"]) "hello world" @?= Just ("", "hello world")
+      , testCase "empty targets list" $
+          runParser (parseWhileOneOf []) "hello world" @?= Nothing
+      ]
   ]

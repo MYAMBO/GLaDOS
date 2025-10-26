@@ -18,7 +18,7 @@ breakOn needle haystack = go haystack []
     go [] acc = (reverse acc, "", "")
     go s acc
       | needle `isPrefixOf` s = (reverse acc, needle, drop (length needle) s)
-      | otherwise = go (tail s) (head s : acc)
+      | otherwise = go (drop 1 s) (head s : acc)
 
 lotSpaceToOne :: String -> String
 lotSpaceToOne [] = []

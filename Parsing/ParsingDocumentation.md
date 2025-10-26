@@ -187,6 +187,21 @@ runParser (parseAnyCharExcept "c") "abcde" -- Just ("ab", "cde")
 runParser (parseAnyCharExcept "tdy") "abcde" -- Just ("abc", "de")
 ```
 
+### `parseWhileOneOf :: [String] -> Parser String`
+Parses characters until one of the target strings from the given list is found.
+Returns the parsed content before the target and leaves the rest (starting with the found target) unconsumed.
+Fails if none of the targets are found in the input or if the target list is empty.
+
+```haskell
+runParser (parseWhileOneOf ["int32", "func"]) "   \n   \t func ... int32" -- Just ("   \n   \t ", "func ... int32")
+
+runParser (parseWhileOneOf ["def", "abc"]) "xyz abc def" -- Just ("xyz ", "abc def")
+
+runParser (parseWhileOneOf ["hello"]) "hello world" -- Just ("", "hello world")
+
+runParser (parseWhileOneOf ["missing"]) "hello world" -- Nothing
+```
+
 ### `parseWithoutConsum :: Parser a -> Parser String`
 Runs a parser but does not consume the parsed part on success.
 
