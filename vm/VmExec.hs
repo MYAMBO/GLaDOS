@@ -155,7 +155,7 @@ applyBinaryOp intOp fltOp dblOp v1 v2 stack
 execOp :: Op -> Stack -> Either String Stack
 execOp Add (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a + b)) (\a b -> FltVal (a + b)) (\a b -> DblVal (a + b)) v1 v2 stack
 execOp Sub (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a - b)) (\a b -> FltVal (a - b)) (\a b -> DblVal (a - b)) v1 v2 stack
-execOp Mul (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a * b)) (\a b -> FltVal (a * b)) (\a b -> DblVal (a + b)) v1 v2 stack
+execOp Mul (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a * b)) (\a b -> FltVal (a * b)) (\a b -> DblVal (a * b)) v1 v2 stack
 execOp Div (v2:v1:stack) =
     case (valToDouble v1, valToDouble v2) of
         (Just d1, Just d2) | d2 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ DblVal (d1 / d2) : stack
