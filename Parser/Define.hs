@@ -5,13 +5,13 @@
 -- Define
 -}
 
-module Sliece.Define where
+module Parser.Define where
 
-import Sliece.Data
+import Parser.Data
 import Parsing
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe)
-import Sliece.Tools (lotSpaceToOne)
+import Parser.Tools (lotSpaceToOne)
 import Control.Applicative ((<|>))
 
 parseTypeAndName :: String -> (String, String)

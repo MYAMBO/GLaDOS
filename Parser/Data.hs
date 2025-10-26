@@ -5,10 +5,11 @@
 -- Data
 -}
 
-module Sliece.Data where
+module Parser.Data where
 
-import Sliece.Tools (breakOn)
+import Data.Char (ord)
 import Text.Read (readMaybe)
+import Parser.Tools (breakOn)
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
 
@@ -110,7 +111,7 @@ data Builtins = Equal
   deriving (Show, Eq)
 
 data Ast = Var VariableAst String -- variable type and name
-         | Litteral VariableAst
+         | Literal VariableAst
          | List [Ast]
          | BinOp Builtins [Ast]
          | Define String Ast

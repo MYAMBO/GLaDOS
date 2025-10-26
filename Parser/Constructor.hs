@@ -5,14 +5,14 @@
 -- Constructor
 -}
 
-module Sliece.Construtor where
+module Parser.Constructor where
 
 import Parsing
-import Sliece.Data
-import Sliece.Body
-import Sliece.Tools
-import Sliece.Parse
-import Sliece.Define
+import Parser.Data
+import Parser.Body
+import Parser.Tools
+import Parser.Parse
+import Parser.Define
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe, isJust)
 import Data.List (isPrefixOf)
@@ -20,12 +20,14 @@ import Control.Applicative ((<|>))
 
 type Env = [Ast]
 
+
 main :: IO ()
 main = do
   mres <- parse
-  let input = maybe [] fst mres
+  let input = maybe [] (filter (not . null) . fst) mres
       finalEnv = parseAllLines input []
   mapM_ print finalEnv
+
 
 parseAllLines :: [String] -> Env -> Env
 parseAllLines [] env = env
@@ -35,7 +37,7 @@ parseAllLines (line:ls) env
       Right ast -> parseAllLines ls (env ++ [ast])
       Left err -> trace ("Error in define: " ++ err) $ parseAllLines ls env
   | "func" `elem` words line =
-    case toEither (runParser astConstrutor line) of
+    case toEither (runParser astConstructor line) of
       Right ast -> parseAllLines ls (env ++ [ast])
       Left err -> trace ("Error in func: " ++ err) $ parseAllLines ls env
   | "$" `elem` words line =
@@ -77,15 +79,15 @@ astReturnTypeParser = do
     trim :: String -> String
     trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
 
-astConstrutor :: Parser Ast
-astConstrutor = do
+astConstructor :: Parser Ast
+astConstructor = do
   _ <- parseString "func"
   _ <- parseMany (parseAnyChar " \t")
   name <- parseWhile (-1) "<"
   args <- astArgumentsParser
   _ <- parseWhile (-1) "=>"
   retType <- astReturnTypeParser
-  let argsAst = map (\arg -> let (t:n:_) = words arg in Var (astFindType t) n) args
+  let argsAst = [Var (astFindType t) n | arg <- args, let ws = words arg, length ws >= 2, let t = ws !! 0, let n = ws !! 1]
   return (Define name (Lambda argsAst (Symbol retType) (Symbol "body")))
   where
     trim :: String -> String

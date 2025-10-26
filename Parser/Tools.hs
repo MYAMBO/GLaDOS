@@ -5,7 +5,7 @@
 -- Tools
 -}
 
-module Sliece.Tools where
+module Parser.Tools where
 
 import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)

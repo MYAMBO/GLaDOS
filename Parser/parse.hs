@@ -5,9 +5,9 @@
 -- parse
 -}
 
-module Sliece.Parse where
+module Parser.Parse where
 
-import Sliece.Data
+import Parser.Data
 import Parsing
 import Control.Applicative (Alternative(..))
 
