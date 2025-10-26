@@ -4,33 +4,26 @@
 -- File description: BytecodeParser
 -}
 
-module BytecodeParser (parseAndExec) where
+module BytecodeParser (parseBytecode, getInstruction) where
 
 import Op
-import VmExec (exec)
-
 import qualified Data.ByteString.Lazy as B
 import Data.Binary.Get
 import Control.Monad (replicateM, when)
 
-parseAndExec :: FilePath -> IO ()
-parseAndExec path = do
+parseBytecode :: FilePath -> IO (Either String (Env, B.ByteString))
+parseBytecode path = do
     content <- B.readFile path
-    case runGetOrFail parseBytecodeFile content of
-        Left (_, _, errMsg) -> putStrLn $ "Parsing error: " ++ errMsg
-        Right (_, _, (env, mainProgram)) ->
-            case exec [] env mainProgram [] of
-                Left err -> putStrLn err
-                Right val -> putStrLn $ show val
+    case runGetOrFail parseHeaderAndEnv content of
+        Left (_, _, errMsg) -> return $ Left $ "Parsing error: " ++ errMsg
+        Right (codeBody, _, env) -> return $ Right (env, codeBody)
 
-parseBytecodeFile :: Get (Env, Program)
-parseBytecodeFile = do
+parseHeaderAndEnv :: Get Env
+parseHeaderAndEnv = do
     magic <- getWord32be
     when (magic /= 0x42414B41) $ fail "Invalid Magic number"
-    _ <- getWord32be -- Skip version number for now
-    env <- getEnv
-    mainProgram <- getProgram
-    return (env, mainProgram)
+    _ <- getWord32be
+    getEnv
 
 getEnv :: Get Env
 getEnv = do
@@ -42,16 +35,8 @@ getEnvEntry = do
     keyLen <- fromIntegral <$> getWord32be
     keyBytes <- getLazyByteString keyLen
     val <- getVal
-    -- Convert lazy bytestring to a standard String
     let key = map (toEnum . fromIntegral) (B.unpack keyBytes)
     return (key, val)
-
-getProgram :: Get Program
-getProgram = do
-    empty <- isEmpty
-    if empty
-        then return []
-        else (:) <$> getInstruction <*> getProgram
 
 getInstruction :: Get Instruction
 getInstruction = getWord8 >>= \opcode -> case opcode of
@@ -73,28 +58,18 @@ getInstruction = getWord8 >>= \opcode -> case opcode of
         strBytes <- getLazyByteString len
         return $ map (toEnum . fromIntegral) (B.unpack strBytes)
 
-
 getVal :: Get Val
 getVal = getWord8 >>= \tag -> case tag of
-    -- Structural types
     0x01 -> BoolVal . (/= 0) <$> getWord8
     0x02 -> Op <$> getOp
     0x03 -> do
-        instrCount <- getWord32be
-        Func <$> replicateM (fromIntegral instrCount) getInstruction
-    -- Signed integer types
-    0x10 -> Int8Val <$> getInt8
-    0x11 -> Int16Val <$> getInt16be
-    0x12 -> Int32Val <$> getInt32be
-    0x13 -> Int64Val <$> getInt64be
-    -- Unsigned integer types
-    0x20 -> Word8Val <$> getWord8
-    0x21 -> Word16Val <$> getWord16be
-    0x22 -> Word32Val <$> getWord32be
-    0x23 -> Word64Val <$> getWord64be
-    -- Floating-point types
-    0x30 -> FltVal <$> getFloatbe
-    0x31 -> DblVal <$> getDoublebe
+        byteLen <- getWord32be
+        Func <$> getLazyByteString (fromIntegral byteLen)
+    0x10 -> Int8Val <$> getInt8; 0x11 -> Int16Val <$> getInt16be
+    0x12 -> Int32Val <$> getInt32be; 0x13 -> Int64Val <$> getInt64be
+    0x20 -> Word8Val <$> getWord8; 0x21 -> Word16Val <$> getWord16be
+    0x22 -> Word32Val <$> getWord32be; 0x23 -> Word64Val <$> getWord64be
+    0x30 -> FltVal <$> getFloatbe; 0x31 -> DblVal <$> getDoublebe
     _    -> fail $ "Unknown value type tag: " ++ show tag
 
 getOp :: Get Op
