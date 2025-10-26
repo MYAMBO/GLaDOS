@@ -20,7 +20,7 @@ tests = testGroup "Parsing tests"
           runParser (parseChar 'a') "abc" @?= Just ('a', "bc")
       ]
 
-  , testGroup "parseAnd"
+  , testGroup "parseAnd" 
       [ testCase "first fail" $
           runParser (parseAnd (parseChar 'a') (parseChar 'a')) "bcd" @?= Nothing
       , testCase "second fail" $
