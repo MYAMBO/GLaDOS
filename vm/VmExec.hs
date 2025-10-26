@@ -172,7 +172,8 @@ execOp Gt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a > b)) (\a b -> BoolV
 execOp Neg (v:stack) = case v of
     Int8Val n -> Right $ Int8Val (negate n) : stack; Int16Val n -> Right $ Int16Val (negate n) : stack
     Int32Val n -> Right $ Int32Val (negate n) : stack; Int64Val n -> Right $ Int64Val (negate n) : stack
-    FltVal n -> Right $ FltVal (negate n) : stack; DblVal n -> Right $ DblVal (negate n) : stack
+    FltVal n -> Right $ FltVal (negate n) : stack
+    DblVal n -> Right $ DblVal (negate n) : stack
     _ -> Left $ "Error: Negation not supported for value: " ++ show v
 
 execOp Not (BoolVal a : stack) = return $ BoolVal (not a) : stack
