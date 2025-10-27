@@ -7,18 +7,29 @@
 
 module CFF.ParseCFF where
 
-import Data
+import CFF.Data
 import Parsing
 import Control.Applicative (Alternative(..))
 
-parseFunc :: String -> Parser String
-parseFunc prefix = prefix <$ pure prefix
+parseFuncLines :: Parser [String]
+parseFuncLines = do
+    _ <- parseString "\n    "
+    line <- parseWhileOneOf ["\n"]
+    let line' = dropWhile (`elem` " \t\n") line
+    rest <- parseFuncLines
+    return (line' : rest)
+    <|> return []
 
-parseFuncDeclaration :: String -> Parser String
-parseFuncDeclaration prefix = prefix <$ pure prefix
+parseFunc :: String -> Parser [String]
+parseFunc prefix = do
+    rest <- parseFuncLines
+    return (prefix : rest)
 
-parseDefine :: String -> Parser String
-parseDefine prefix = prefix <$ pure prefix
+parseFuncDeclaration :: String -> Parser [String]
+parseFuncDeclaration prefix = [prefix] <$ pure prefix
+
+parseDefine :: String -> Parser [String]
+parseDefine prefix = [prefix] <$ pure prefix
 
 parseElt :: Parser String
 parseElt = parseString "$"
@@ -33,15 +44,27 @@ parseNext = parseWhileOneOf ["func", "define", "$", "//", "/*", "*/"]
 
 parseCFF :: Parser [String]
 parseCFF = do
+    _ <- parseMany (parseAnyChar " \t\n")
     elt <- parseElt
-    str <- parseNext
     str <- case elt of
-        "func" -> parseFuncDeclaration ("func" ++ str)
-        "define" -> parseDefine ("define" ++ str)
-        "$" -> parseFunc ("$" ++ str)
-        _ -> "" <$ pure ""
+        "func" -> do
+            a <- parseWhileOneOf ["\n"]
+            parseFuncDeclaration ("func" ++ a)
+        "define" -> do
+            a <- parseWhileOneOf ["\n"]
+            parseDefine ("define" ++ a)
+        "$" -> do
+            name <- parseWhileOneOf ["\n", " ", "\t"]
+            parseFunc ('$' : name)
+        "//" -> do
+            _ <- parseWhileOneOf ["\n"]
+            return [""]
+        "/*" -> do
+            _ <- parseWhile (-1) "*/"
+            return [""]
+        _ -> [""] <$ pure ""
     other <- parseCFF
-    return (str : other)
+    return (str ++ other)
     <|> do
     a <- parseAnyCharExcept ""
     return [a]
@@ -56,5 +79,5 @@ parseFile path = do
     content <- readFile path
     return $ runParser startParseCFF content
 
-start :: IO (Maybe ([String], String))
-start = parseFile "exemple.cff"
+parse :: IO (Maybe ([String], String))
+parse = parseFile "exemple.cff"
