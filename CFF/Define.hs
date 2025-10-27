@@ -9,16 +9,10 @@ module CFF.Define where
 
 import CFF.Data
 import Parsing
-import Data.Maybe (fromMaybe)
 import Debug.Trace (trace)
+import Data.Maybe (fromMaybe)
+import CFF.Tools (lotSpaceToOne)
 import Control.Applicative ((<|>))
-
---define double pi = 3.14159
-
-lotSpaceToOne :: String -> String
-lotSpaceToOne [] = []
-lotSpaceToOne (' ':xs) = ' ' : lotSpaceToOne (dropWhile (== ' ') xs)
-lotSpaceToOne (x:xs) = x : lotSpaceToOne xs
 
 parseTypeAndName :: String -> (String, String)
 parseTypeAndName s =

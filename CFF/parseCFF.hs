@@ -17,7 +17,7 @@ parseFuncLines = do
     line <- parseWhileOneOf ["\n"]
     let line' = dropWhile (`elem` " \t\n") line
     rest <- parseFuncLines
-    return (line' : rest)
+    return (("   " ++ line') : rest)
     <|> return []
 
 parseFunc :: String -> Parser [String]
@@ -54,7 +54,7 @@ parseCFF = do
             a <- parseWhileOneOf ["\n"]
             parseDefine ("define" ++ a)
         "$" -> do
-            name <- parseWhileOneOf ["\n", " ", "\t"]
+            name <- parseWhileOneOf ["\n", "\t"]
             parseFunc ('$' : name)
         "//" -> do
             _ <- parseWhileOneOf ["\n"]

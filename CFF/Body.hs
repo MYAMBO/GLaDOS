@@ -7,11 +7,14 @@
 
 module CFF.Body where
 
-import CFF.Data
 import Parsing
-import Data.Maybe (fromMaybe)
+import CFF.Data
+import CFF.Tools
 import Debug.Trace (trace)
+import Text.Read (readMaybe)
 import Control.Applicative ((<|>))
+import Data.Maybe (fromMaybe, isJust)
+import Data.List (stripPrefix, find, isPrefixOf)
 
 parseBodyHeader :: Parser String
 parseBodyHeader = do
@@ -21,30 +24,90 @@ parseBodyHeader = do
   _ <- parseMany (parseAnyChar " \t\n")
   return funcName
 
-buildBodyAsts :: [String] -> [Ast]
-buildBodyAsts lines =
-  map parseBodyLine lines
+binaryOperators :: [String]
+binaryOperators = ["==", "!=", "<", ">", "<=", ">=", "+", "-", "*", "/", "%"]
 
-parseBodyLine :: String -> Ast
-parseBodyLine line =
-  case words line of
-    ("any":op:a:b:[]) ->
-      BinOp (astFindOperation op) [Symbol a, Symbol b]
-    (varType:name:value:[]) ->
-      Define name (Var (addValueToVar (astFindType varType) value) name)
-    _ ->
-      Symbol (trimLine line)
+parseExpression :: String -> Ast
+parseExpression exprString =
+    let trimmedExpr = trimLine exprString
+    in case findBinaryOp trimmedExpr of
+        Just (op, left, right) ->
+            BinOp (astFindOperation op) [parseAtom (trimLine left), parseAtom (trimLine right)]
+        Nothing ->
+            parseAtom trimmedExpr
 
-trimLine :: String -> String
-trimLine s =
-  reverse (dropWhile (`elem` " \t") (reverse (dropWhile (`elem` " \t") s)))
+findBinaryOp :: String -> Maybe (String, String, String)
+findBinaryOp s =
+    find (\op -> let (_, opFound, _) = breakOn op s in not (null opFound)) binaryOperators >>= \op ->
+        let (left, opFound, right) = breakOn op s
+        in Just (opFound, left, right)
+
+parseAtom :: String -> Ast
+parseAtom s =
+    case readMaybe s of
+        Just (n :: Int) -> Litteral (Int32 (fromIntegral n))
+        Nothing ->
+            case readMaybe s of
+                Just (f :: Double) -> Litteral (Double f)
+                Nothing ->
+                    case readMaybe s of
+                        Just (b :: Bool) -> Litteral (Bool b)
+                        Nothing -> Symbol s
+
+buildBodyAsts :: [String] -> Ast
+buildBodyAsts [] = List []
+buildBodyAsts rawLines =
+    let (ifBlocks, elseBlock) = splitIfElseBlocks rawLines
+    in buildIfChain ifBlocks elseBlock
+
+splitIfElseBlocks :: [String] -> ([(String, [String])], [String])
+splitIfElseBlocks [] = ([], [])
+splitIfElseBlocks (l:ls) =
+    case breakOnArrow (trimLine l) of
+        Just (conditionPart, thenPartStr) ->
+            let (thisThenLinesRaw, remainingLs) = collectUntilNextIf ls
+                thisThenLines = if null thenPartStr then thisThenLinesRaw else thenPartStr : thisThenLinesRaw
+                (nextIfBlocks, finalElseBlock) = splitIfElseBlocks remainingLs
+            in ((conditionPart, thisThenLines) : nextIfBlocks, finalElseBlock)
+        Nothing -> ([], l:ls)
+
+breakOnArrow :: String -> Maybe (String, String)
+breakOnArrow s =
+    case breakOn "->" s of
+        (pre, "->", post) -> Just (trimLine pre, trimLine post)
+        _ -> Nothing
+
+isIfLine :: String -> Bool
+isIfLine s = isJust (breakOnArrow (trimLine s))
+
+collectUntilNextIf :: [String] -> ([String], [String])
+collectUntilNextIf [] = ([], [])
+collectUntilNextIf (l:ls)
+    | isIfLine l = ([], l:ls)
+    | otherwise =
+        let (collected, rest) = collectUntilNextIf ls
+        in (trimLine l : collected, rest)
+
+buildIfChain :: [(String, [String])] -> [String] -> Ast
+buildIfChain [] [] = List []
+buildIfChain [] elseLines =
+    case map parseExpression elseLines of
+        [singleExpr] -> singleExpr
+        exprs -> List exprs
+buildIfChain ((condStr, thenLines):restIfBlocks) finalElseLines =
+    let conditionAst = parseExpression condStr
+        thenAst = case map parseExpression thenLines of
+                    [singleExpr] -> singleExpr
+                    exprs -> List exprs
+        elseAst = buildIfChain restIfBlocks finalElseLines
+    in If conditionAst thenAst elseAst
 
 fillBody :: [Ast] -> String -> [String] -> [Ast]
 fillBody env funcName rawBodyLines =
-  let bodyAsts = buildBodyAsts rawBodyLines
-  in map (patchFuncBody funcName bodyAsts) env
+  let bodyAst = buildBodyAsts rawBodyLines 
+  in map (patchFuncBody funcName bodyAst) env
 
-patchFuncBody :: String -> [Ast] -> Ast -> Ast
-patchFuncBody name body (Define n (Lambda args retType (Symbol "body")))
-  | n == name = Define n (Lambda args retType (List body))
+patchFuncBody :: String -> Ast -> Ast -> Ast
+patchFuncBody name bodyAst (Define n (Lambda args retType (Symbol "body")))
+  | n == name = Define n (Lambda args retType bodyAst)
 patchFuncBody _ _ other = other

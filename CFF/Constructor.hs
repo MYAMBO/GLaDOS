@@ -10,9 +10,12 @@ module CFF.Constructor where
 import Parsing
 import CFF.Data
 import CFF.Body
+import CFF.Tools
 import CFF.Define
 import CFF.ParseCFF (parse)
 import Debug.Trace (trace)
+import Data.Maybe (fromMaybe, isJust)
+import Data.List (isPrefixOf)
 import Control.Applicative ((<|>))
 
 type Env = [Ast]
@@ -49,7 +52,7 @@ collectBodyLines [] = ([], [])
 collectBodyLines (l:ls)
   | isIndented l =
     let (body, rest) = collectBodyLines ls
-    in (CFF.Body.trimLine l : body, rest)
+    in (trimLine l : body, rest)
   | otherwise = ([], l:ls)
   where
     isIndented s = case s of
@@ -59,7 +62,7 @@ collectBodyLines (l:ls)
 astArgumentsParser :: Parser [String]
 astArgumentsParser = do
   args <- parseWhile (-1) ">"
-  let argList = map trim (splitArgs args)
+  let argList = map trimLine (splitArgs args)
   return argList
   where
     splitArgs :: String -> [String]
@@ -68,13 +71,10 @@ astArgumentsParser = do
       (arg, []) -> [arg]
       (arg, _:rest) -> arg : splitArgs rest
 
-    trim :: String -> String
-    trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
-
 astReturnTypeParser :: Parser String
 astReturnTypeParser = do
   retType <- parseAnyCharExcept "\n"
-  return (trim retType)
+  return (trimLine retType)
   where
     trim :: String -> String
     trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
