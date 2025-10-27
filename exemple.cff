@@ -1,0 +1,36 @@
+/*
+// EPITECH PROJECT, 2025
+// GLaDOS
+// File description:
+// test.cff
+*/
+
+define Double pi = 3.14159
+
+// ceci est un commentaire
+
+func fact<Int32 n> => Int32
+
+define Double e = 2.71828
+
+/*
+ceci est un autre commentaire
+hellooooo
+*/
+
+func myIsNeg<Int32 n> => Int8
+
+func main<> => Int32
+
+$ fact
+    n == 1 -> 1
+    n < 1  -> -1
+    -> n * fact (n - 1)
+
+$ myIsNeg
+    n < 0 -> 'N'
+    -> 'P'
+
+$ main
+    -> fact 5
+    
