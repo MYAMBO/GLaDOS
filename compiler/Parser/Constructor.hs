@@ -20,6 +20,11 @@ import Control.Applicative ((<|>))
 
 type Env = [Ast]
 
+splitArgs :: String -> [String]
+splitArgs [] = []
+splitArgs s = case break (== ',') s of
+  (arg, []) -> [arg]
+  (arg, _:rest) -> arg : splitArgs rest
 
 main :: IO ()
 main = do
@@ -64,20 +69,11 @@ astArgumentsParser = do
   args <- parseWhile (-1) ">"
   let argList = map trimLine (splitArgs args)
   return argList
-  where
-    splitArgs :: String -> [String]
-    splitArgs [] = []
-    splitArgs s = case break (== ',') s of
-      (arg, []) -> [arg]
-      (arg, _:rest) -> arg : splitArgs rest
 
 astReturnTypeParser :: Parser String
 astReturnTypeParser = do
   retType <- parseAnyCharExcept "\n"
   return (trimLine retType)
-  where
-    trim :: String -> String
-    trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
 
 astConstructor :: Parser Ast
 astConstructor = do
@@ -89,6 +85,3 @@ astConstructor = do
   retType <- astReturnTypeParser
   let argsAst = [Var (astFindType t) n | arg <- args, let ws = words arg, length ws >= 2, let t = ws !! 0, let n = ws !! 1]
   return (Define name (Lambda argsAst (Symbol retType) (Symbol "body")))
-  where
-    trim :: String -> String
-    trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")

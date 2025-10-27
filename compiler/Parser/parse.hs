@@ -80,4 +80,4 @@ parseFile path = do
     return $ runParser startParseCFF content
 
 parse :: IO (Maybe ([String], String))
-parse = parseFile "exemple.cff"
+parse = parseFile "exemple.lie"

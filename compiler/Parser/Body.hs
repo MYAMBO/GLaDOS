@@ -38,14 +38,12 @@ parseFunctionCall s =
            argsAst = [parseExpression argsStr]
        in Just $ Call (Symbol name) argsAst
      else
-       -- Gère `fact 5`
        let argsAst = map parseExpression (words trimmedRest)
        in Just $ Call (Symbol name) argsAst
 
 parseAtom :: String -> Ast
 parseAtom s
-    | length s == 3 && head s == '\'' && last s == '\'' =
-        Literal (Int8 (fromIntegral (ord (s !! 1))))
+    | length s == 3 && head s == '\'' && last s == '\'' = Literal (Int8 (fromIntegral (ord (s !! 1))))
     | otherwise = fromMaybe
         (fromMaybe (Symbol s) (parseFunctionCall s)) $
         (Literal . Int32 . fromIntegral <$> (readMaybe s :: Maybe Int))

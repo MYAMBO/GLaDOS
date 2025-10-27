@@ -32,3 +32,6 @@ cleanCommentLine s = s
 trimLine :: String -> String
 trimLine s =
   reverse (dropWhile (`elem` " \t") (reverse (dropWhile (`elem` " \t") s)))
+
+trim :: String -> String
+trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
