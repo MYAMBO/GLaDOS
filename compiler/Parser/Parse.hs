@@ -5,10 +5,11 @@
 -- parse
 -}
 
-module Parser.Parse where
+module Parse where
 
-import Parser.Data
+import Data
 import Parsing
+import System.Directory (doesFileExist)
 import Control.Applicative (Alternative(..))
 
 parseFuncLines :: Parser [String]
@@ -54,7 +55,7 @@ parseCFF = do
             a <- parseWhileOneOf ["\n"]
             parseDefine ("define" ++ a)
         "$" -> do
-            name <- parseWhileOneOf ["\n", "\t"]
+            name <- parseWhileOneOf ["\n"]
             parseFunc ('$' : name)
         "//" -> do
             _ <- parseWhileOneOf ["\n"]
@@ -74,10 +75,24 @@ startParseCFF = do
     parseNext
     parseCFF
 
-parseFile :: FilePath -> IO (Maybe ([String], String))
-parseFile path = do
-    content <- readFile path
+readAllFile :: [String] -> IO String
+readAllFile [] = return "\n"
+readAllFile (x:xs) = do
+    exist <- doesFileExist x
+    if not exist
+      then do
+        putStrLn ("File not found: " ++ x)
+        rest <- readAllFile xs
+        return ('\n' : rest)
+      else do
+        content <- readFile x
+        rest <- readAllFile xs
+        return (content ++ "\n" ++ rest)
+
+parseFile :: [String] -> IO (Maybe ([String], String))
+parseFile paths = do
+    content <- readAllFile paths
     return $ runParser startParseCFF content
 
-parse :: IO (Maybe ([String], String))
-parse = parseFile "exemple.lie"
+parse :: [String] -> IO (Maybe ([String], String))
+parse files = parseFile files

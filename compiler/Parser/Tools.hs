@@ -5,7 +5,7 @@
 -- Tools
 -}
 
-module Parser.Tools where
+module Tools where
 
 import Data.Char (isSpace)
 import Text.Read (readMaybe)

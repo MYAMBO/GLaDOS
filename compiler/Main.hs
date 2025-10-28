@@ -8,38 +8,38 @@
 module Main where
 
 import Compiler (compile)
-import Ast (Ast(..), Builtins(..), VariableAst(..))
+import System.Environment (getArgs)
+import Constructor (parseAllLines)
+import Parse (parse)
+import Data (Ast(..), Builtins(..), VariableAst(..))
 import qualified Data.ByteString.Lazy as BL
+
+getAst :: (Maybe ([String], String)) -> [Ast]
+getAst lines = parseAllLines (maybe [] (filter (not . null) . fst) lines) []
 
 main :: IO ()
 main = do
-    let handmadeAstList =
-            [
-              Define "add"
-                (Lambda
-                    [ Var (Int32 0) "a"
-                    , Var (Int32 0) "b"
-                    ]
-                    (Symbol "Int32")
-                    (BinOp Add [Symbol "a", Symbol "b"])
-                )
-            , Call (Symbol "add") [Literal (Int32 40), Literal (Int32 2)]
-            ]
+    files <- getArgs
+    if files == [] then
+        putStrLn "Please provide at least one input file."
+    else do
+        mres <- parse files
+        let astList = getAst mres
 
-    putStrLn "--- Compiling Handmade AST with New Function Structure ---"
-    mapM_ print handmadeAstList
-    putStrLn "--------------------------------------------------------"
+        putStrLn "--- Compiling Handmade AST with New Function Structure ---"
+        mapM_ print astList
+        putStrLn "--------------------------------------------------------"
 
-    compilationResult <- compile handmadeAstList
+        compilationResult <- compile astList
 
-    case compilationResult of
-        Left compileError -> do
-            putStrLn "\n❌ Compilation Failed:"
-            putStrLn compileError
-        Right bytecode -> do
-            let outputFilename = "output.gdbc"
-            putStrLn $ "\n✅ Compilation Successful!"
-            BL.writeFile outputFilename bytecode
-            putStrLn $ "Bytecode written to '" ++ outputFilename ++ "'"
-            putStrLn "\nTo run the test, use the following command:"
-            putStrLn $ "  ./glados-vm " ++ outputFilename
+        case compilationResult of
+            Left compileError -> do
+                putStrLn "\n❌ Compilation Failed:"
+                putStrLn compileError
+            Right bytecode -> do
+                let outputFilename = "output.gdbc"
+                putStrLn $ "\n✅ Compilation Successful!"
+                BL.writeFile outputFilename bytecode
+                putStrLn $ "Bytecode written to '" ++ outputFilename ++ "'"
+                putStrLn "\nTo run the test, use the following command:"
+                putStrLn $ "  ./glados-vm " ++ outputFilename

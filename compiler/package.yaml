@@ -7,11 +7,14 @@ dependencies:
   - bytestring
   - containers
   - mtl
+  - directory
 
 executables:
   glados-compiler:
     main: Main.hs
-    source-dirs: .
+    source-dirs:
+      - .
+      - ../Parsing
     ghc-options:
       - -Wall
       - -Wextra
