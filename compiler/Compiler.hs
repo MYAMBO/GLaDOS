@@ -7,7 +7,7 @@
 
 module Compiler (compile) where
 
-import Ast (Ast(..), Builtins(..), VariableAst(..))
+import Data (Ast(..), Builtins(..), VariableAst(..))
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
 import Data.Word (Word8)

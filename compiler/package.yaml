@@ -11,7 +11,10 @@ dependencies:
 executables:
   glados-compiler:
     main: Main.hs
-    source-dirs: .
+    source-dirs:
+      - .
+      - ../Parser
+      - ../Parsing
     ghc-options:
       - -Wall
       - -Wextra
