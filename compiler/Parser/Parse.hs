@@ -5,10 +5,9 @@
 -- parse
 -}
 
-module Parse where
+module Parser.Parse where
 
-import Data
-import Parsing
+import Parsing.Parsing
 import Control.Applicative (Alternative(..))
 
 parseFuncLines :: Parser [String]
@@ -71,10 +70,11 @@ parseCFF = do
 
 startParseCFF :: Parser [String]
 startParseCFF = do
-    parseNext
+    _ <- parseNext
     parseCFF
 
 readAllFile :: [String] -> IO String
+readAllFile [] = return ""
 readAllFile [x] = readFile x
 readAllFile (x:xs) = do
     content <- readFile x

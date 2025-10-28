@@ -5,7 +5,7 @@
 -- Parsing
 -}
 
-module Parsing where
+module Parsing.Parsing where
 
 import Control.Monad(guard)
 import Data.List (isSuffixOf)

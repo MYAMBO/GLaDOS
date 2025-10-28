@@ -5,17 +5,16 @@
 -- Body
 -}
 
-module Body where
+module Parser.Body where
 
-import Parsing
-import Data
-import Tools
-import Debug.Trace (trace)
+import Parsing.Parsing
+import DataTypes
+import Parser.Tools
 import Text.Read (readMaybe)
 import Control.Applicative ((<|>))
 import Data.Maybe (fromMaybe, isJust)
-import Data.List (stripPrefix, find, isPrefixOf)
-import Data.Char (isSpace, isAlphaNum, ord)
+import Data.List (find, isPrefixOf)
+import Data.Char (isAlphaNum, ord)
 
 parseBodyHeader :: Parser String
 parseBodyHeader = do
@@ -33,18 +32,28 @@ parseFunctionCall s =
   let (name, rest) = span isAlphaNum s
       trimmedRest = trimLine rest
   in if null name || null trimmedRest then Nothing
-     else if head trimmedRest == '(' && last trimmedRest == ')' then
-       let argsStr = take (length trimmedRest - 2) (tail trimmedRest)
-           argsAst = [parseExpression argsStr]
-       in Just $ Call (Symbol name) argsAst
-     else
-       -- Gère `fact 5`
-       let argsAst = map parseExpression (words trimmedRest)
-       in Just $ Call (Symbol name) argsAst
+     else case trimmedRest of
+            '(':xs -> case unsnoc xs of
+                        Just (argsStr, ')') ->
+                           let argsAst = [parseExpression argsStr]
+                           in Just $ Call (Symbol name) argsAst
+                        _ -> Nothing
+            _ -> -- Gère `fact 5`
+                 let argsAst = map parseExpression (words trimmedRest)
+                 in Just $ Call (Symbol name) argsAst
+
+-- Safe last/init
+unsnoc :: [a] -> Maybe ([a], a)
+unsnoc [] = Nothing
+unsnoc [x] = Just ([], x)
+unsnoc (x:xs) =
+    case unsnoc xs of
+        Just (ys, z) -> Just (x:ys, z)
+        Nothing      -> Nothing -- Logically unreachable, but makes the function total
 
 parseAtom :: String -> Ast
 parseAtom s
-    | length s == 3 && head s == '\'' && last s == '\'' =
+    | length s == 3 && s!!0 == '\'' && s!!2 == '\'' =
         Literal (Int8 (fromIntegral (ord (s !! 1))))
     | otherwise = fromMaybe
         (fromMaybe (Symbol s) (parseFunctionCall s)) $
@@ -55,6 +64,7 @@ parseAtom s
 findBinaryOp :: String -> Maybe (String, String, String)
 findBinaryOp s = findOp s 0 Nothing
   where
+    findOp :: String -> Int -> Maybe (String, String, String) -> Maybe (String, String, String)
     findOp [] _ result = result
     findOp (c:cs) level result
       | c == '(' = findOp cs (level + 1) result
@@ -70,14 +80,21 @@ findBinaryOp s = findOp s 0 Nothing
 parseExpression :: String -> Ast
 parseExpression exprString =
     let trimmedExpr = trimLine exprString
-    in if head trimmedExpr == '(' && last trimmedExpr == ')'
-        then parseExpression (take (length trimmedExpr - 2) (tail trimmedExpr))
-        else case findBinaryOp trimmedExpr of
-          Just (op, left, right) ->
-            if null (trimLine left) && op == "-"
-            then parseAtom (op ++ right)
-            else BinOp (astFindOperation op) [parseExpression left, parseExpression right]
-          Nothing -> parseAtom trimmedExpr
+    in case trimmedExpr of
+        '(':xs -> case unsnoc xs of
+                    Just (inner, ')') -> parseExpression inner
+                    _ -> case findBinaryOp trimmedExpr of
+                            Just (op, left, right) ->
+                                if null (trimLine left) && op == "-"
+                                then parseAtom (op ++ right)
+                                else BinOp (astFindOperation op) [parseExpression left, parseExpression right]
+                            Nothing -> parseAtom trimmedExpr
+        _ -> case findBinaryOp trimmedExpr of
+                Just (op, left, right) ->
+                    if null (trimLine left) && op == "-"
+                    then parseAtom (op ++ right)
+                    else BinOp (astFindOperation op) [parseExpression left, parseExpression right]
+                Nothing -> parseAtom trimmedExpr
 
 buildBodyAsts :: [String] -> Ast
 buildBodyAsts [] = List []

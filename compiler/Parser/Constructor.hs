@@ -5,18 +5,14 @@
 -- Constructor
 -}
 
-module Constructor where
+module Parser.Constructor where
 
-import Parsing
-import Data
-import Body
-import Tools
-import Parse
-import Define
+import Parser.Define
+import Parsing.Parsing
+import DataTypes
+import Parser.Body
+import Parser.Tools
 import Debug.Trace (trace)
-import Data.Maybe (fromMaybe, isJust)
-import Data.List (isPrefixOf)
-import Control.Applicative ((<|>))
 
 type Env = [Ast]
 
@@ -66,9 +62,6 @@ astReturnTypeParser :: Parser String
 astReturnTypeParser = do
   retType <- parseAnyCharExcept "\n"
   return (trimLine retType)
-  where
-    trim :: String -> String
-    trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
 
 astConstructor :: Parser Ast
 astConstructor = do
@@ -80,6 +73,3 @@ astConstructor = do
   retType <- astReturnTypeParser
   let argsAst = [Var (astFindType t) n | arg <- args, let ws = words arg, length ws >= 2, let t = ws !! 0, let n = ws !! 1]
   return (Define name (Lambda argsAst (Symbol retType) (Symbol "body")))
-  where
-    trim :: String -> String
-    trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")

@@ -5,20 +5,17 @@
 -- Tools
 -}
 
-module Tools where
+module Parser.Tools where
 
 import Data.List (isPrefixOf)
-import Data.Maybe (fromMaybe)
-import Text.Read (readMaybe)
-
 
 breakOn :: String -> String -> (String, String, String)
 breakOn needle haystack = go haystack []
   where
     go [] acc = (reverse acc, "", "")
-    go s acc
+    go s@(c:cs) acc
       | needle `isPrefixOf` s = (reverse acc, needle, drop (length needle) s)
-      | otherwise = go (drop 1 s) (head s : acc)
+      | otherwise = go cs (c : acc)
 
 lotSpaceToOne :: String -> String
 lotSpaceToOne [] = []

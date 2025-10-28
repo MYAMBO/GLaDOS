@@ -7,11 +7,10 @@
 
 module Compiler (compile) where
 
-import Data (Ast(..), Builtins(..), VariableAst(..))
+import DataTypes (Ast(..), Builtins(..), VariableAst(..))
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
 import Data.Word (Word8)
-import Data.Int (Int8, Int16, Int32, Int64)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Control.Monad.State (StateT, gets, modify, runStateT, lift)
@@ -155,10 +154,10 @@ compileAst (BinOp op args) = do
             Not -> (1, args); Neg -> (1, args); _ -> (2, args)
     if length args /= requiredArity then throwError $ "Operation '" ++ show op ++ "' expects " ++ show requiredArity ++ " args."
     else
-        case op of
-            NotEqual           -> compileTransformedOp (head argNodes) (argNodes !! 1) Equal Not
-            LessThanOrEqual    -> compileTransformedOp (head argNodes) (argNodes !! 1) GreaterThan Not
-            GreaterThanOrEqual -> compileTransformedOp (head argNodes) (argNodes !! 1) LessThan Not
+        case (op, argNodes) of
+            (NotEqual, [arg1, arg2])           -> compileTransformedOp arg1 arg2 Equal Not
+            (LessThanOrEqual, [arg1, arg2])    -> compileTransformedOp arg1 arg2 GreaterThan Not
+            (GreaterThanOrEqual, [arg1, arg2]) -> compileTransformedOp arg1 arg2 LessThan Not
             _ -> do
                 emitBuiltinOp op
                 mapM_ compileAst argNodes

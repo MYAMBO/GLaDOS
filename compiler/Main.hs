@@ -9,13 +9,13 @@ module Main where
 
 import Compiler (compile)
 import System.Environment (getArgs)
-import Constructor (parseAllLines)
-import Parse (parse)
-import Data (Ast(..), Builtins(..), VariableAst(..))
+import Parser.Constructor (parseAllLines)
+import Parser.Parse (parse)
+import DataTypes (Ast(..))
 import qualified Data.ByteString.Lazy as BL
 
 getAst :: (Maybe ([String], String)) -> [Ast]
-getAst lines = parseAllLines (maybe [] (filter (not . null) . fst) lines) []
+getAst mLines = parseAllLines (maybe [] (filter (not . null) . fst) mLines) []
 
 main :: IO ()
 main = do
