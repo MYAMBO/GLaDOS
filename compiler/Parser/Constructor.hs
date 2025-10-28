@@ -11,13 +11,9 @@ import Parsing
 import Parser.Data
 import Parser.Body
 import Parser.Tools
-import Parser.Parse
 import Parser.Define
 import Data.Char (isSpace)
 import Debug.Trace (trace)
-import Data.Maybe (fromMaybe, isJust)
-import Data.List (isPrefixOf, isSuffixOf)
-import Control.Applicative ((<|>))
 
 type Env = [Ast]
 
@@ -63,15 +59,11 @@ handleBody line ls env =
           Right updatedEnv -> parseAllLines remainingLines updatedEnv
     Nothing -> traceError "Error: Failed to parse function body header" line env
 
-handleUnknown :: String -> Env -> Env
-handleUnknown line env =
-  let context = if null env
-                then "Parsing failed at the beginning of the file."
-                else "This occurred after successfully parsing: " ++ show (last env)
-      cleanedLine = dropWhile isSpace line
+handleUnknown :: String -> Env
+handleUnknown line =
+  let cleanedLine = dropWhile isSpace line
       firstLineOnly = takeWhile (/= '\n') cleanedLine
-  in trace ("\n---\n[!] Error: Unknown statement or syntax error.\n" ++
-            "> In: \"" ++ firstLineOnly ++ "\"\n") $ []
+  in trace ("\n---\n[!] Error: Unknown statement or syntax error.\n> In: \"" ++ firstLineOnly ++ "\"\n") $ []
 
 parseAllLines :: [String] -> Env -> Env
 parseAllLines [] env = env
@@ -80,7 +72,7 @@ parseAllLines (line:ls) env
   | "define" `elem` words line = handleDefine line ls env
   | "func" `elem` words line   = handleFunc line ls env
   | "$" `elem` words line      = handleBody line ls env
-  | otherwise                  = handleUnknown line env
+  | otherwise                  = handleUnknown line
 
 collectBodyLines :: [String] -> ([String], [String])
 collectBodyLines [] = ([], [])

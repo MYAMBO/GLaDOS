@@ -7,30 +7,20 @@
 
 module Main where
 
+import Parser.Data
 import Compiler (compile)
-import System.Environment (getArgs)
 import Parser.Constructor
 import Debug.Trace (trace)
 import Parser.Parse (parse)
 import Parser.Tools (trimLine)
-import Parser.Data (Ast(..), Builtins(..), VariableAst(..))
+import System.Environment (getArgs)
 import qualified Data.ByteString.Lazy as BL
 
--- Cette fonction prend le résultat brut du parsing de fichier et renvoie l'AST.
--- Elle gère le déballage du Maybe, le filtrage des lignes, et la vérification du main.
 getAst :: Maybe ([String], String) -> [Ast]
 getAst mres =
-    let -- 1. On extrait les lignes brutes. Si c'est Nothing, on prend une liste vide.
-        -- On suppose ici qu'on veut juste la première partie du tuple (les lignes).
-        rawInput = maybe [] fst mres
-
-        -- 2. On nettoie les lignes vides.
+    let rawInput = maybe [] fst mres
         nonEmptyLines = filter (not . null . trimLine) rawInput
-
-        -- 3. On lance votre parseur principal.
         finalEnv = parseAllLines nonEmptyLines []
-
-    -- 4. On vérifie si 'main' existe et on retourne le résultat approprié.
     in if isMainHere finalEnv
        then finalEnv
        else trace "\n---\n[!] Error: 'main' function is missing.\n---" []
@@ -38,20 +28,15 @@ getAst mres =
 main :: IO ()
 main = do
     files <- getArgs
-    if null files then -- 'null files' est plus idiomatique que 'files == []'
+    if null files then
         putStrLn "Please provide at least one input file."
     else do
         mres <- parse files
-
-        -- CORRECTION ICI : on utilise 'let' car getAst est une fonction pure.
         let astList = getAst mres
-
-        -- Petite sécurité : si la liste est vide (à cause d'une erreur tracée plus tôt),
-        -- on évite peut-être de lancer la compilation.
         if null astList
         then putStrLn "Parsing failed or produced no output. Aborting compilation."
         else do
-            putStrLn "--- Compiling Handmade AST with New Function Structure ---"
+            putStrLn "--- Compiling Files with New Function Structure ---"
             mapM_ print astList
             putStrLn "--------------------------------------------------------"
 

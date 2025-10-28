@@ -10,13 +10,14 @@ module Parser.Tools where
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
 
+breakOnGo :: String -> String -> String -> (String, String, String)
+breakOnGo _ [] acc = (reverse acc, "", "")
+breakOnGo needle s@(c:cs) acc
+  | needle `isPrefixOf` s = (reverse acc, needle, drop (length needle) s)
+  | otherwise = breakOnGo needle cs (c : acc)
+
 breakOn :: String -> String -> (String, String, String)
-breakOn needle haystack = go haystack []
-  where
-    go [] acc = (reverse acc, "", "")
-    go s acc
-      | needle `isPrefixOf` s = (reverse acc, needle, drop (length needle) s)
-      | otherwise = go (drop 1 s) (head s : acc)
+breakOn needle haystack = breakOnGo needle haystack []
 
 lotSpaceToOne :: String -> String
 lotSpaceToOne [] = []

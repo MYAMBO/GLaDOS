@@ -10,10 +10,12 @@ module Parser.Body where
 import Parsing
 import Parser.Data
 import Parser.Tools
+import Data.Maybe (isJust)
 import Text.Read (readMaybe)
-import Data.Maybe (fromMaybe, isJust)
-import Data.List (stripPrefix, find, isPrefixOf)
-import Data.Char (isSpace, isAlphaNum, ord)
+import Data.Maybe (fromMaybe)
+import Data.Char (isAlphaNum, ord)
+import Control.Applicative ((<|>))
+import Data.List (find, isPrefixOf, uncons, unsnoc)
 
 type ParseResult = Either String Ast
 
@@ -28,51 +30,80 @@ parseBodyHeader = do
 binaryOperators :: [String]
 binaryOperators = ["==", "!=", "<=", ">=", "<", ">", "+", "-", "*", "/", "%"]
 
+
 parseFunctionCall :: [Ast] -> [Ast] -> String -> ParseResult
 parseFunctionCall env localArgs s =
   let (name, rest) = span isAlphaNum s
       trimmedRest = trimLine rest
-  in if null name || null trimmedRest
-     then Left $ "Invalid function call syntax for: \"" ++ s ++ "\""
-     else if not (null trimmedRest) && head trimmedRest == '(' && last trimmedRest == ')' then
-        let argsStr = take (length trimmedRest - 2) (tail trimmedRest)
-        in do
-             argsAst <- parseExpression env localArgs argsStr
-             return $ Call (Symbol name) [argsAst]
-     else do
-        argsAsts <- traverse (parseExpression env localArgs) (words trimmedRest)
-        return $ Call (Symbol name) argsAsts
+  in
+    if null name || null trimmedRest then
+      Left $ "Invalid function call syntax for: \"" ++ s ++ "\""
+    else
+      case uncons trimmedRest of
+        Just ('(', middleAndLast) ->
+          case unsnoc middleAndLast of
+            Just (middle, ')') -> do
+              argsAst <- parseExpression env localArgs middle
+              return $ Call (Symbol name) [argsAst]
+            _ -> Left $ "Syntax error: Unterminated parenthesis in function call \"" ++ s ++ "\""
+        _ -> do
+          argsAsts <- traverse (parseExpression env localArgs) (words trimmedRest)
+          return $ Call (Symbol name) argsAsts
+
+parseCharLiteral :: String -> Maybe ParseResult
+parseCharLiteral s =
+    case s of
+        ['\'', char, '\''] -> Just $ Right $ Literal (Int8 (fromIntegral (ord char)))
+        ('\'' : _)         -> Just $ Left $ "Syntax error: Invalid or unterminated character literal: " ++ s
+        _                  -> Nothing 
+
+parseNumericOrBool :: String -> Maybe ParseResult
+parseNumericOrBool s =
+    (parseNum s) <|> (parseBool s)
+    where
+      parseNum str = case readMaybe str :: Maybe Double of
+        Just f -> if f == fromInteger (round f)
+                  then Just $ Right $ Literal (Int32 (round f))
+                  else Just $ Right $ Literal (Double f)
+        Nothing -> Nothing
+      
+      parseBool str = case readMaybe str :: Maybe Bool of
+        Just b -> Just $ Right $ Literal (Bool b)
+        Nothing -> Nothing
+
+parseSymbolOrCall :: [Ast] -> [Ast] -> String -> ParseResult
+parseSymbolOrCall env localArgs s
+    | ' ' `elem` s || '(' `elem` s = parseFunctionCall env localArgs s
+    | isDefinedFunc env s          = Right $ Call (Symbol s) []
+    | isLocalArg localArgs s       = Right $ Symbol s
+    | otherwise                    = Left $ "Error: Use of undeclared function or variable '" ++ s ++ "'"
 
 parseAtom :: [Ast] -> [Ast] -> String -> ParseResult
-parseAtom env localArgs s
-    | not (null s) && head s == '\'' =
-        if length s == 3 && last s == '\''
-        then Right $ Literal (Int8 (fromIntegral (ord (s !! 1))))
-        else Left $ "Syntax error: Invalid or unterminated character literal: " ++ s
-    | otherwise =
-        case readMaybe s :: Maybe Double of
-            Just f ->
-                if f == fromInteger (round f)
-                then Right $ Literal (Int32 (round f))
-                else Right $ Literal (Double f)
-            Nothing ->
-                case readMaybe s :: Maybe Bool of
-                    Just b -> Right $ Literal (Bool b)
-                    Nothing ->
-                      if ' ' `elem` s || '(' `elem` s then
-                        parseFunctionCall env localArgs s
-                      else if isDefinedFunc env s then
-                        Right $ Call (Symbol s) []
-                      else if isLocalArg localArgs s then
-                        Right $ Symbol s
-                      else
-                        Left $ "Error: Use of undeclared function or variable '" ++ s ++ "'"
-
+parseAtom env localArgs s =
+    fromMaybe (parseSymbolOrCall env localArgs s) $
+        parseCharLiteral s <|> parseNumericOrBool s
 
 data ScanState = ScanState {
     level  :: Int,
     bestOp :: Maybe (String, Int)
 }
+
+scanChar :: String -> [String] -> ScanState -> (Char, Int) -> ScanState
+scanChar str binaryOps state@(ScanState lvl _) (char, pos) =
+  case char of
+    '(' -> state { level = lvl + 1 }
+    ')' -> state { level = lvl - 1 }
+    _   -> if lvl == 0
+           then
+             case find (`isPrefixOf` drop pos str) binaryOps of
+               Just op -> state { bestOp = Just (op, pos) }
+               Nothing -> state
+           else state
+
+findBestOp :: String -> Maybe (String, Int)
+findBestOp str =
+    let scanner = scanChar str binaryOperators
+    in bestOp $ foldl scanner (ScanState 0 Nothing) (zip str [0..])
 
 findBinaryOp :: String -> Maybe (String, String, String)
 findBinaryOp str =
@@ -82,22 +113,6 @@ findBinaryOp str =
       let (left, rightWithOp) = splitAt pos str
           right = drop (length op) rightWithOp
       in Just (op, left, right)
-
-findBestOp :: String -> Maybe (String, Int)
-findBestOp str =
-    bestOp $ foldl scanChar (ScanState 0 Nothing) (zip str [0..])
-    where
-      scanChar :: ScanState -> (Char, Int) -> ScanState
-      scanChar state@(ScanState lvl currentBest) (char, pos) =
-        case char of
-          '(' -> state { level = lvl + 1 }
-          ')' -> state { level = lvl - 1 }
-          _   -> if lvl == 0
-                 then
-                   case find (`isPrefixOf` drop pos str) binaryOperators of
-                     Just op -> state { bestOp = Just (op, pos) }
-                     Nothing -> state
-                 else state
 
 parseExpression :: [Ast] -> [Ast] -> String -> ParseResult
 parseExpression env localArgs exprString =
@@ -127,7 +142,7 @@ buildBodyAsts env localArgs rawLines =
        else buildIfChain env localArgs ifBlocks elseBlock
 
 buildIfChain :: [Ast] -> [Ast] -> [(String, [String])] -> [String] -> ParseResult
-buildIfChain env localArgs [] [] = Right $ List []
+buildIfChain _ _ [] [] = Right $ List []
 buildIfChain env localArgs [] elseLines = do
     exprs <- traverse (parseExpression env localArgs) elseLines
     Right $ case exprs of
