@@ -19,6 +19,11 @@ import Data.List (find, isPrefixOf, uncons, unsnoc)
 
 type ParseResult = Either String Ast
 
+data ScanState = ScanState {
+    level  :: Int,
+    bestOp :: Maybe (String, Int)
+}
+
 parseBodyHeader :: Parser String
 parseBodyHeader = do
   _ <- parseString "$"
@@ -26,10 +31,6 @@ parseBodyHeader = do
   funcName <- parseAnyCharExcept "\n"
   _ <- parseMany (parseAnyChar " \t\n")
   return funcName
-
-binaryOperators :: [String]
-binaryOperators = ["==", "!=", "<=", ">=", "<", ">", "+", "-", "*", "/", "%"]
-
 
 parseFunctionCall :: [Ast] -> [Ast] -> String -> ParseResult
 parseFunctionCall env localArgs s =
@@ -82,11 +83,6 @@ parseAtom :: [Ast] -> [Ast] -> String -> ParseResult
 parseAtom env localArgs s =
     fromMaybe (parseSymbolOrCall env localArgs s) $
         parseCharLiteral s <|> parseNumericOrBool s
-
-data ScanState = ScanState {
-    level  :: Int,
-    bestOp :: Maybe (String, Int)
-}
 
 scanChar :: String -> [String] -> ScanState -> (Char, Int) -> ScanState
 scanChar str binaryOps state@(ScanState lvl _) (char, pos) =
@@ -172,14 +168,14 @@ splitIfElseBlocks (l:ls) =
             in ((conditionPart, thisThenLines) : nextIfBlocks, finalElseBlock)
         Nothing -> ([], l:ls)
 
+isIfLine :: String -> Bool
+isIfLine s = isJust (breakOnArrow (trimLine s))
+
 breakOnArrow :: String -> Maybe (String, String)
 breakOnArrow s =
     case breakOn "->" s of
         (pre, "->", post) -> Just (trimLine pre, trimLine post)
         _ -> Nothing
-
-isIfLine :: String -> Bool
-isIfLine s = isJust (breakOnArrow (trimLine s))
 
 collectUntilNextIf :: [String] -> ([String], [String])
 collectUntilNextIf [] = ([], [])

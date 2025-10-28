@@ -17,11 +17,10 @@ import Debug.Trace (trace)
 
 type Env = [Ast]
 
-splitArgs :: String -> [String]
-splitArgs [] = []
-splitArgs s = case break (== ',') s of
-  (arg, []) -> [arg]
-  (arg, _:rest) -> arg : splitArgs rest
+-- =============================================================================
+-- Fonctions d'aide pour le parsing des lignes
+-- =============================================================================
+
 
 isMainHere :: Env -> Bool
 isMainHere [] = True

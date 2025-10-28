@@ -33,3 +33,12 @@ trimLine = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
 trim :: String -> String
 trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")
+
+splitArgs :: String -> [String]
+splitArgs [] = []
+splitArgs s = case break (== ',') s of
+  (arg, []) -> [arg]
+  (arg, _:rest) -> arg : splitArgs rest
+
+binaryOperators :: [String]
+binaryOperators = ["==", "!=", "<=", ">=", "<", ">", "+", "-", "*", "/", "%"]
