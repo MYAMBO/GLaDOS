@@ -1,4 +1,4 @@
--- test/TestParsing.hs
+
 module TestParsing (tests) where
 
 import Control.Applicative (Alternative(..))
