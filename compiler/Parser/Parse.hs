@@ -5,9 +5,8 @@
 -- parse
 -}
 
-module Parse where
+module Parser.Parse where
 
-import Data
 import Parsing
 import System.Directory (doesFileExist)
 import Control.Applicative (Alternative(..))
@@ -72,7 +71,7 @@ parseCFF = do
 
 startParseCFF :: Parser [String]
 startParseCFF = do
-    parseNext
+    _ <- parseNext
     parseCFF
 
 readAllFile :: [String] -> IO String

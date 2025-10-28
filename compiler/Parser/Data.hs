@@ -5,11 +5,9 @@
 -- Data
 -}
 
-module Data where
+module Parser.Data where
 
-import Data.Char (ord)
 import Text.Read (readMaybe)
-import Tools (breakOn)
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
 
@@ -30,7 +28,7 @@ astFindType "Float"   = Float 0.0
 astFindType "Double"  = Double 0.0
 astFindType "Bool"    = Bool False
 astFindType "String"  = String ""
-astFindType _         = String ""
+astFindType _         = String "error"
 
 addValueToVar :: VariableAst -> String -> VariableAst
 addValueToVar (Int8 _) val    = Int8 (read val :: Int8)

@@ -7,13 +7,12 @@
 
 module Compiler (compile) where
 
-import Data (Ast(..), Builtins(..), VariableAst(..))
-import qualified Data.ByteString.Builder as BB
-import qualified Data.ByteString.Lazy as BL
 import Data.Word (Word8)
-import Data.Int (Int8, Int16, Int32, Int64)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Builder as BB
+import Parser.Data (Ast(..), Builtins(..), VariableAst(..))
 import Control.Monad.State (StateT, gets, modify, runStateT, lift)
 import Control.Monad.Except (ExceptT, runExceptT, throwError, liftEither)
 
