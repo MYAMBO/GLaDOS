@@ -14,8 +14,6 @@ import Parse (parse)
 import Data (Ast(..), Builtins(..), VariableAst(..))
 import qualified Data.ByteString.Lazy as BL
 
-import System.Environment (getArgs)
-
 getAst :: (Maybe ([String], String)) -> [Ast]
 getAst lines = parseAllLines (maybe [] (filter (not . null) . fst) lines) []
 
