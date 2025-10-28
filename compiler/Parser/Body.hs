@@ -24,6 +24,11 @@ data ScanState = ScanState {
     bestOp :: Maybe (String, Int)
 }
 
+-- =============================================================================
+-- HEADER PARSING IMPLEMENTATION
+-- =============================================================================
+
+
 parseBodyHeader :: Parser String
 parseBodyHeader = do
   _ <- parseString "$"
@@ -31,6 +36,11 @@ parseBodyHeader = do
   funcName <- parseAnyCharExcept "\n"
   _ <- parseMany (parseAnyChar " \t\n")
   return funcName
+
+
+-- =============================================================================
+-- BODY PARSING IMPLEMENTATION
+-- =============================================================================
 
 parseFunctionCall :: [Ast] -> [Ast] -> String -> ParseResult
 parseFunctionCall env localArgs s =

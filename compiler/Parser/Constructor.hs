@@ -18,7 +18,7 @@ import Debug.Trace (trace)
 type Env = [Ast]
 
 -- =============================================================================
--- Fonctions d'aide pour le parsing des lignes
+-- CONSTRUCTOR PARSING IMPLEMENTATION
 -- =============================================================================
 
 
