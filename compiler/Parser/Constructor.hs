@@ -11,9 +11,9 @@ import Parsing
 import Parser.Data
 import Parser.Body
 import Parser.Tools
-import Data.Char (isSpace)
 import Parser.Parse
 import Parser.Define
+import Data.Char (isSpace)
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe, isJust)
 import Data.List (isPrefixOf, isSuffixOf)
@@ -33,22 +33,6 @@ isMainHere env = any isMainFunc env
   where
     isMainFunc (Define "main" (Lambda _ _ _)) = True
     isMainFunc _                              = False
-
-main :: IO ()
-main = do
-  mres <- parse
-  let input  = maybe [] (filter (not . null) . fst) mres
-
-  let debugOutput = "--- DEBUG: Lines before parsing ---\n" ++
-                    unlines (zipWith (\n l -> show n ++ ": " ++ l) [1..] input) ++
-                    "---------------------------------"
-  seq (trace debugOutput ()) $ do
-    let nonEmptyLines = filter (not . null . trimLine) input
-        finalEnv = parseAllLines nonEmptyLines []
-        envWithMain = if isMainHere finalEnv
-                    then finalEnv
-                    else trace "\n---\n[!] Error: 'main' function is missing.\n---" []
-    mapM_ print envWithMain
 
 traceError :: String -> String -> Env -> Env
 traceError errorType line env =

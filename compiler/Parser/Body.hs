@@ -10,9 +10,7 @@ module Parser.Body where
 import Parsing
 import Parser.Data
 import Parser.Tools
-import Debug.Trace (trace)
 import Text.Read (readMaybe)
-import Control.Applicative ((<|>))
 import Data.Maybe (fromMaybe, isJust)
 import Data.List (stripPrefix, find, isPrefixOf)
 import Data.Char (isSpace, isAlphaNum, ord)

@@ -5,14 +5,12 @@
 -- Define
 -}
 
-module Define where
+module Parser.Define where
 
-import Data
+import Parser.Data
 import Parsing
 import Debug.Trace (trace)
-import Data.Maybe (fromMaybe)
-import Tools (lotSpaceToOne, trim)
-import Control.Applicative ((<|>))
+import Parser.Tools (lotSpaceToOne, trim)
 
 parseTypeAndName :: String -> (String, String)
 parseTypeAndName s =

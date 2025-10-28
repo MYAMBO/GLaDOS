@@ -5,11 +5,9 @@
 -- Tools
 -}
 
-module Tools where
+module Parser.Tools where
 
 import Data.Char (isSpace)
-import Text.Read (readMaybe)
-import Data.Maybe (fromMaybe)
 import Data.List (isPrefixOf)
 
 breakOn :: String -> String -> (String, String, String)

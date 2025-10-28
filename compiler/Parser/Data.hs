@@ -5,11 +5,10 @@
 -- Data
 -}
 
-module Data where
+module Parser.Data where
 
-import Data.Char (ord)
 import Text.Read (readMaybe)
-import Tools (breakOn)
+import Parser.Tools (breakOn)
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
 
