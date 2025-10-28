@@ -148,7 +148,7 @@ buildBodyAsts env localArgs rawLines =
        else buildIfChain env localArgs ifBlocks elseBlock
 
 buildIfChain :: [Ast] -> [Ast] -> [(String, [String])] -> [String] -> ParseResult
-buildIfChain _ _ [] [] = Right $ List []
+buildIfChain _ _ [] [] = Right $ Symbol "END"
 buildIfChain env localArgs [] elseLines = do
     exprs <- traverse (parseExpression env localArgs) elseLines
     Right $ case exprs of
