@@ -17,15 +17,14 @@ fclean:	clean fclean_vm fclean_compiler
 
 tests_run:
 	@echo "Running tests (root)..."
-	@$(STACK) test --coverage || true
 	@mkdir -p $(COVERAGE_DIR)
-	@stack hpc report --all --destdir $(COVERAGE_DIR) || true
+	@stack hpc report --all --destdir $(COVERAGE_DIR)
 	@echo "Running tests (vm)..."
-	@cd $(VM_DIR) && $(STACK) test --coverage || true
-	@cd $(VM_DIR) && stack hpc report --all --destdir coverage || true
+	@cd $(VM_DIR) && $(STACK) test --coverage
+	@cd $(VM_DIR) && stack hpc report --all --destdir coverage
 	@echo "Running tests (compiler)..."
-	@cd $(COMPILER_DIR) && $(STACK) test --coverage || true
-	@cd $(COMPILER_DIR) && stack hpc report --all --destdir coverage || true
+	@cd $(COMPILER_DIR) && $(STACK) test --coverage
+	@cd $(COMPILER_DIR) && stack hpc report --all --destdir coverage
 	@echo "Collecting coverage reports..."
 
 xml_gen:
