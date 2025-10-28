@@ -7,8 +7,10 @@ import Test.Tasty.Ingredients.Basic
 import System.IO
 import Text.Printf
 
+import TestParsing (tests)
+
 main :: IO ()
 main = defaultMainWithIngredients [antXMLRunner, consoleTestReporter, listingTests] $
   testGroup "Tests"
-    [
+    [ tests
     ]

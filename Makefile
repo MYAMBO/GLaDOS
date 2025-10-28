@@ -16,10 +16,16 @@ clean:	clean_vm clean_compiler
 fclean:	clean fclean_vm fclean_compiler
 
 tests_run:
-	@echo "Running tests..."
-	@$(STACK) test --coverage
+	@echo "Running tests (root)..."
 	@mkdir -p $(COVERAGE_DIR)
 	@stack hpc report --all --destdir $(COVERAGE_DIR)
+	@echo "Running tests (vm)..."
+	@cd $(VM_DIR) && $(STACK) test --coverage
+	@cd $(VM_DIR) && stack hpc report --all --destdir coverage
+	@echo "Running tests (compiler)..."
+	@cd $(COMPILER_DIR) && $(STACK) test --coverage
+	@cd $(COMPILER_DIR) && stack hpc report --all --destdir coverage
+	@echo "Collecting coverage reports..."
 
 xml_gen:
 	@mkdir -p build/test-results/test
