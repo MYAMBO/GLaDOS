@@ -22,7 +22,7 @@ getAst lines = parseAllLines (maybe [] (filter (not . null) . fst) lines) []
 main :: IO ()
 main = do
     files <- getArgs
-    mres <- parse (head files)
+    mres <- parse files
     let astList = getAst mres
 
     putStrLn "--- Compiling Handmade AST with New Function Structure ---"

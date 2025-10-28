@@ -74,10 +74,17 @@ startParseCFF = do
     parseNext
     parseCFF
 
-parseFile :: FilePath -> IO (Maybe ([String], String))
-parseFile path = do
-    content <- readFile path
+readAllFile :: [String] -> IO String
+readAllFile [x] = readFile x
+readAllFile (x:xs) = do
+    content <- readFile x
+    rest <- readAllFile xs
+    return (content ++ "\n" ++ rest)
+
+parseFile :: [String] -> IO (Maybe ([String], String))
+parseFile paths = do
+    content <- readAllFile paths
     return $ runParser startParseCFF content
 
-parse :: String -> IO (Maybe ([String], String))
-parse file = parseFile file
+parse :: [String] -> IO (Maybe ([String], String))
+parse files = parseFile files
