@@ -5,9 +5,9 @@
 -- parse
 -}
 
-module Parser.Parse where
+module Parse where
 
-import Parser.Data
+import Data
 import Parsing
 import Control.Applicative (Alternative(..))
 
@@ -79,5 +79,5 @@ parseFile path = do
     content <- readFile path
     return $ runParser startParseCFF content
 
-parse :: IO (Maybe ([String], String))
-parse = parseFile "exemple.cff"
+parse :: String -> IO (Maybe ([String], String))
+parse file = parseFile file

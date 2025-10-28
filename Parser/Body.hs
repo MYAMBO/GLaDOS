@@ -5,11 +5,11 @@
 -- Body
 -}
 
-module Parser.Body where
+module Body where
 
 import Parsing
-import Parser.Data
-import Parser.Tools
+import Data
+import Tools
 import Debug.Trace (trace)
 import Text.Read (readMaybe)
 import Control.Applicative ((<|>))

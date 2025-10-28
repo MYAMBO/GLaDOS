@@ -5,7 +5,7 @@
 -- Tools
 -}
 
-module Parser.Tools where
+module Tools where
 
 import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)

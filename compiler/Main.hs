@@ -8,29 +8,28 @@
 module Main where
 
 import Compiler (compile)
-import Ast (Ast(..), Builtins(..), VariableAst(..))
+import System.Environment (getArgs)
+import Constructor (parseAllLines)
+import Parse (parse)
+import Data (Ast(..), Builtins(..), VariableAst(..))
 import qualified Data.ByteString.Lazy as BL
+
+import System.Environment (getArgs)
+
+getAst :: (Maybe ([String], String)) -> [Ast]
+getAst lines = parseAllLines (maybe [] (filter (not . null) . fst) lines) []
 
 main :: IO ()
 main = do
-    let handmadeAstList =
-            [
-              Define "add"
-                (Lambda
-                    [ Var (Int32 0) "a"
-                    , Var (Int32 0) "b"
-                    ]
-                    (Symbol "Int32")
-                    (BinOp Add [Symbol "a", Symbol "b"])
-                )
-            , Call (Symbol "add") [Literal (Int32 40), Literal (Int32 2)]
-            ]
+    files <- getArgs
+    mres <- parse (head files)
+    let astList = getAst mres
 
     putStrLn "--- Compiling Handmade AST with New Function Structure ---"
-    mapM_ print handmadeAstList
+    mapM_ print astList
     putStrLn "--------------------------------------------------------"
 
-    compilationResult <- compile handmadeAstList
+    compilationResult <- compile astList
 
     case compilationResult of
         Left compileError -> do

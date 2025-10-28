@@ -5,29 +5,20 @@
 -- Constructor
 -}
 
-module Parser.Constructor where
+module Constructor where
 
 import Parsing
-import Parser.Data
-import Parser.Body
-import Parser.Tools
-import Parser.Parse
-import Parser.Define
+import Data
+import Body
+import Tools
+import Parse
+import Define
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe, isJust)
 import Data.List (isPrefixOf)
 import Control.Applicative ((<|>))
 
 type Env = [Ast]
-
-
-main :: IO ()
-main = do
-  mres <- parse
-  let input = maybe [] (filter (not . null) . fst) mres
-      finalEnv = parseAllLines input []
-  mapM_ print finalEnv
-
 
 parseAllLines :: [String] -> Env -> Env
 parseAllLines [] env = env
