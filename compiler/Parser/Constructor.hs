@@ -11,11 +11,12 @@ import Parsing
 import Parser.Data
 import Parser.Body
 import Parser.Tools
+import Data.Char (isSpace)
 import Parser.Parse
 import Parser.Define
 import Debug.Trace (trace)
 import Data.Maybe (fromMaybe, isJust)
-import Data.List (isPrefixOf)
+import Data.List (isPrefixOf, isSuffixOf)
 import Control.Applicative ((<|>))
 
 type Env = [Ast]
@@ -26,33 +27,76 @@ splitArgs s = case break (== ',') s of
   (arg, []) -> [arg]
   (arg, _:rest) -> arg : splitArgs rest
 
+isMainHere :: Env -> Bool
+isMainHere [] = True
+isMainHere env = any isMainFunc env
+  where
+    isMainFunc (Define "main" (Lambda _ _ _)) = True
+    isMainFunc _                              = False
+
 main :: IO ()
 main = do
   mres <- parse
-  let input = maybe [] (filter (not . null) . fst) mres
-      finalEnv = parseAllLines input []
-  mapM_ print finalEnv
+  let input  = maybe [] (filter (not . null) . fst) mres
 
+  let debugOutput = "--- DEBUG: Lines before parsing ---\n" ++
+                    unlines (zipWith (\n l -> show n ++ ": " ++ l) [1..] input) ++
+                    "---------------------------------"
+  seq (trace debugOutput ()) $ do
+    let nonEmptyLines = filter (not . null . trimLine) input
+        finalEnv = parseAllLines nonEmptyLines []
+        envWithMain = if isMainHere finalEnv
+                    then finalEnv
+                    else trace "\n---\n[!] Error: 'main' function is missing.\n---" []
+    mapM_ print envWithMain
+
+traceError :: String -> String -> Env -> Env
+traceError errorType line env =
+  let cleanedLine = dropWhile isSpace line
+      firstLineOnly = takeWhile (/= '\n') cleanedLine
+  in trace ("\n---\n[!] " ++ errorType ++ ".\n> In: \"" ++ firstLineOnly ++ "\"\n---") env
+
+handleDefine :: String -> [String] -> Env -> Env
+handleDefine line ls env =
+  case toEither (runParser astDefine line) of
+    Right ast -> parseAllLines ls (env ++ [ast])
+    Left _    -> traceError "Syntax error in 'define' statement" line env
+
+handleFunc :: String -> [String] -> Env -> Env
+handleFunc line ls env =
+  case toEither (runParser astConstructor line) of
+    Right ast -> parseAllLines ls (env ++ [ast])
+    Left _    -> traceError "Syntax error in 'func' statement" line env
+
+handleBody :: String -> [String] -> Env -> Env
+handleBody line ls env =
+  case runParser parseBodyHeader line of
+    Just (funcName, _) ->
+      let (bodyLines, remainingLines) = collectBodyLines ls
+      in
+        case fillBody env funcName bodyLines of
+          Left err -> trace ("\n---\n[!] " ++ err ++ "\n---") []
+          Right updatedEnv -> parseAllLines remainingLines updatedEnv
+    Nothing -> traceError "Error: Failed to parse function body header" line env
+
+handleUnknown :: String -> Env -> Env
+handleUnknown line env =
+  let context = if null env
+                then "Parsing failed at the beginning of the file."
+                else "This occurred after successfully parsing: " ++ show (last env)
+      cleanedLine = dropWhile isSpace line
+      firstLineOnly = takeWhile (/= '\n') cleanedLine
+  in trace ("\n---\n[!] Error: Unknown statement or syntax error.\n" ++
+            "> In: \"" ++ firstLineOnly ++ "\"\n") $ []
 
 parseAllLines :: [String] -> Env -> Env
 parseAllLines [] env = env
 parseAllLines (line:ls) env
-  | "define" `elem` words line =
-    case toEither (runParser astDefine line) of
-      Right ast -> parseAllLines ls (env ++ [ast])
-      Left err -> trace ("Error in define: " ++ err) $ parseAllLines ls env
-  | "func" `elem` words line =
-    case toEither (runParser astConstructor line) of
-      Right ast -> parseAllLines ls (env ++ [ast])
-      Left err -> trace ("Error in func: " ++ err) $ parseAllLines ls env
-  | "$" `elem` words line =
-    case runParser parseBodyHeader line of
-      Just (funcName, _) ->
-        let (bodyLines, remainingLines) = collectBodyLines ls
-            updatedEnv = fillBody env funcName bodyLines
-        in parseAllLines remainingLines updatedEnv
-      Nothing -> trace ("Failed to parse body header: " ++ line) $ parseAllLines ls env
-  | otherwise = trace ("Unknown line format: " ++ line) $ parseAllLines ls env
+  | null (trimLine line)       = parseAllLines ls env
+  | "define" `elem` words line = handleDefine line ls env
+  | "func" `elem` words line   = handleFunc line ls env
+  | "$" `elem` words line      = handleBody line ls env
+  | otherwise                  = handleUnknown line env
 
 collectBodyLines :: [String] -> ([String], [String])
 collectBodyLines [] = ([], [])
@@ -79,9 +123,9 @@ astConstructor :: Parser Ast
 astConstructor = do
   _ <- parseString "func"
   _ <- parseMany (parseAnyChar " \t")
-  name <- parseWhile (-1) "<"
+  name <- parseWhile (1) "<"
   args <- astArgumentsParser
-  _ <- parseWhile (-1) "=>"
+  _ <- parseWhile (1) "=>"
   retType <- astReturnTypeParser
   let argsAst = [Var (astFindType t) n | arg <- args, let ws = words arg, length ws >= 2, let t = ws !! 0, let n = ws !! 1]
   return (Define name (Lambda argsAst (Symbol retType) (Symbol "body")))

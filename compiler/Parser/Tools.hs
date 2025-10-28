@@ -7,10 +7,10 @@
 
 module Parser.Tools where
 
-import Data.List (isPrefixOf)
-import Data.Maybe (fromMaybe)
+import Data.Char (isSpace)
 import Text.Read (readMaybe)
-
+import Data.Maybe (fromMaybe)
+import Data.List (isPrefixOf)
 
 breakOn :: String -> String -> (String, String, String)
 breakOn needle haystack = go haystack []
@@ -30,8 +30,7 @@ cleanCommentLine ('-':'-':rest) = dropWhile (== ' ') rest
 cleanCommentLine s = s
 
 trimLine :: String -> String
-trimLine s =
-  reverse (dropWhile (`elem` " \t") (reverse (dropWhile (`elem` " \t") s)))
+trimLine = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
 trim :: String -> String
 trim = reverse . dropWhile (`elem` " \t") . reverse . dropWhile (`elem` " \t")

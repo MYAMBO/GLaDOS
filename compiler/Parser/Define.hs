@@ -20,11 +20,18 @@ parseTypeAndName s =
         varName = trim rest
     in (varType, varName)
 
+isGoodType :: VariableAst -> Bool
+isGoodType (String "error") = False
+isGoodType _                = True
+
 astDefine :: Parser Ast
 astDefine = do
     _ <- parseString "define"
     typeAndName <- parseWhile (-1) "="
     let (varType, varName) = parseTypeAndName (lotSpaceToOne (trim typeAndName))
-    value <- parseAnyCharExcept "\n"
-    let cleanValue = removeSpaces value
-    return $ Define varName (Var (addValueToVar (astFindType varType) cleanValue) varName)
+    if not (isGoodType (astFindType varType))
+      then return $ trace ("Unknown type in define: " ++ varType) $ Define varName (Var (String "error") varName)
+      else do
+        value <- parseAnyCharExcept "\n"
+        let cleanValue = removeSpaces value
+        return $ Define varName (Var (addValueToVar (astFindType varType) cleanValue) varName)
