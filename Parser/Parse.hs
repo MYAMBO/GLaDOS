@@ -92,7 +92,6 @@ readAllFile (x:xs) = do
 parseFile :: [String] -> IO (Maybe ([String], String))
 parseFile paths = do
     content <- readAllFile paths
-    putStrLn ("content :\n'" ++ content ++ "'")
     return $ runParser startParseCFF content
 
 parse :: [String] -> IO (Maybe ([String], String))
