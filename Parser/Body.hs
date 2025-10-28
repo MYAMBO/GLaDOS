@@ -70,7 +70,9 @@ findBinaryOp s = findOp s 0 Nothing
 parseExpression :: String -> Ast
 parseExpression exprString =
     let trimmedExpr = trimLine exprString
-    in if head trimmedExpr == '(' && last trimmedExpr == ')'
+  in if null trimmedExpr
+     then List []
+     else if head trimmedExpr == '(' && last trimmedExpr == ')'
         then parseExpression (take (length trimmedExpr - 2) (tail trimmedExpr))
         else case findBinaryOp trimmedExpr of
           Just (op, left, right) ->
