@@ -30,7 +30,7 @@ astFindType "Float"   = Float 0.0
 astFindType "Double"  = Double 0.0
 astFindType "Bool"    = Bool False
 astFindType "String"  = String ""
-astFindType _         = String ""
+astFindType _         = String "error"
 
 addValueToVar :: VariableAst -> String -> VariableAst
 addValueToVar (Int8 _) val    = Int8 (read val :: Int8)
