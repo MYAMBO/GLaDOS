@@ -9,23 +9,11 @@ dependencies:
 - mtl       
 - directory 
 
-name:                glados-compiler
-version:             0.1.0.0
-
-dependencies:
-- base >= 4.7 && < 5
-- containers
-- bytestring
-- binary
-- mtl
-- directory
-
 library:
   source-dirs:
   - .
   - ../Parsing
   exposed-modules:
-  - Main
   - Compiler
   - BytecodeConvertor
   - Parser.Data
