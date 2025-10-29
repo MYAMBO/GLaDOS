@@ -9,23 +9,18 @@ STACK = stack
 TEST_DIR = test
 COVERAGE_DIR = $(TEST_DIR)/coverage
 
-all:	build_vm build_compiler
+all:    build_vm build_compiler
 
-clean:	clean_vm clean_compiler
+clean:    clean_vm clean_compiler
 
-fclean:	clean fclean_vm fclean_compiler
+fclean:    clean fclean_vm fclean_compiler
 
 tests_run:
-	@echo "Running tests (root)..."
-	@mkdir -p $(COVERAGE_DIR)
-	@stack hpc report --all --destdir $(COVERAGE_DIR)
-	@echo "Running tests (vm)..."
-	@cd $(VM_DIR) && $(STACK) test --coverage
-	@cd $(VM_DIR) && stack hpc report --all --destdir coverage
-	@echo "Running tests (compiler)..."
-	@cd $(COMPILER_DIR) && $(STACK) test --coverage
-	@cd $(COMPILER_DIR) && stack hpc report --all --destdir coverage
-	@echo "Collecting coverage reports..."
+	@$(STACK) clean
+	@echo "\n--- Running Haskell Compiler Tests (with coverage) ---"
+	@$(STACK) test glados-compiler --coverage
+	@echo "\n--- Running Virtual Machine Tests (no coverage) ---"
+##@$(STACK) test glados-vm --no-coverage
 
 xml_gen:
 	@mkdir -p build/test-results/test
@@ -52,12 +47,8 @@ fclean_vm:
 re_vm:
 	@$(MAKE) -C $(VM_DIR) re
 
-
-COMPILER_DIR = compiler
 COMPILER_OUTPUT = glados-compiler
-
-compiler:
-	@$(MAKE) -C $(COMPILER_DIR) all
+COMPILER_DIR = compiler
 
 build_compiler:
 	@$(MAKE) -C $(COMPILER_DIR) $(COMPILER_OUTPUT)

@@ -1,8 +1,8 @@
 ##
 ## EPITECH PROJECT, 2025
-## GLaDOS VM
+## GLaDOS Compiler
 ## File description:
-## Makefile for the standalone VM
+## Makefile for the standalone Compiler
 ##
 
 STACK = stack
@@ -14,10 +14,6 @@ $(OUTPUT):
 	@echo "Building GLaDOS Compiler..."
 	@$(STACK) install --local-bin-path "./"
 	@mv $(OUTPUT) ../$(OUTPUT)
-
-run: $(OUTPUT)
-	@echo "Running GLaDOS Compiler..."
-	@../$(OUTPUT) $(ARGS)
 
 clean:
 	@echo "Cleaning GLaDOS Compiler project..."
