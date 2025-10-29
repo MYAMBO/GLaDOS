@@ -111,34 +111,76 @@ findBestOp str =
     let scanner = scanChar str binaryOperators
     in bestOp $ foldl scanner (ScanState 0 Nothing) (zip str [0..])
 
-findBinaryOp :: String -> Maybe (String, String, String)
-findBinaryOp str =
-  case findBestOp str of
+findLastOpWorker :: String -> [String] -> Int -> Maybe (String, Int) -> String -> Maybe (String, Int)
+findLastOpWorker originalStr ops level bestOp [] = bestOp
+findLastOpWorker originalStr ops level bestOp (c:cs) =
+  let newLevel = case c of
+                   '(' -> level + 1
+                   ')' -> level - 1
+                   _   -> level
+      currentPos = length originalStr - length (c:cs)
+      newBestOp  = if level == 0
+                   then case find (`isPrefixOf` (c:cs)) ops of
+                          Just foundOp -> Just (foundOp, currentPos)
+                          Nothing      -> bestOp
+                   else bestOp
+  in findLastOpWorker originalStr ops newLevel newBestOp cs
+
+findLastOp :: String -> [String] -> Maybe (String, String, String)
+findLastOp str ops =
+  case findLastOpWorker str ops 0 Nothing str of
     Nothing -> Nothing
     Just (op, pos) ->
       let (left, rightWithOp) = splitAt pos str
           right = drop (length op) rightWithOp
       in Just (op, left, right)
 
+parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
+parseFactor env localArgs s =
+  let trimmed = trimLine s
+  in case uncons trimmed of
+       Just ('(', rest) ->
+         case unsnoc rest of
+           Just (middle, ')') -> parseComparison env localArgs middle
+           _ -> Left $ "Syntax error: Unterminated parenthesis in expression \"" ++ trimmed ++ "\""
+       _ -> parseAtom env localArgs trimmed
+
+parseTerm :: [Ast] -> [Ast] -> String -> ParseResult
+parseTerm env localArgs s =
+  case findLastOp s ["*", "/", "%"] of
+    Just (op, left, right) -> do
+      leftAst <- parseTerm env localArgs left
+      rightAst <- parseFactor env localArgs right
+      Right $ BinOp (astFindOperation op) [leftAst, rightAst]
+    Nothing -> parseFactor env localArgs s
+
+parseAddition :: [Ast] -> [Ast] -> String -> ParseResult
+parseAddition env localArgs s =
+  case findLastOp s ["+", "-"] of
+    Just (op, left, right) ->
+      if op == "-" && null (trimLine left)
+      then parseAtom env localArgs s
+      else do
+        leftAst <- parseAddition env localArgs left
+        rightAst <- parseTerm env localArgs right
+        Right $ BinOp (astFindOperation op) [leftAst, rightAst]
+    Nothing -> parseTerm env localArgs s
+
+parseComparison :: [Ast] -> [Ast] -> String -> ParseResult
+parseComparison env localArgs s =
+  case findLastOp s ["==", "!=", "<", ">", "<=", ">="] of
+    Just (op, left, right) -> do
+      leftAst <- parseComparison env localArgs left
+      rightAst <- parseAddition env localArgs right
+      Right $ BinOp (astFindOperation op) [leftAst, rightAst]
+    Nothing -> parseAddition env localArgs s
+
 parseExpression :: [Ast] -> [Ast] -> String -> ParseResult
 parseExpression env localArgs exprString =
     let trimmedExpr = trimLine exprString
     in if null trimmedExpr
        then Left "Cannot parse an empty expression."
-       else case findBinaryOp trimmedExpr of
-            Just (op, left, right) -> do
-                let leftTrimmed = trimLine left
-                let rightTrimmed = trimLine right
-                if op == "-" && null leftTrimmed then
-                    parseAtom env localArgs trimmedExpr
-                else if null leftTrimmed || null rightTrimmed then
-                    Left $ "Incomplete expression for operator '" ++ op ++ "' in: \"" ++ trimmedExpr ++ "\""
-                else do
-                    leftAst <- parseExpression env localArgs leftTrimmed
-                    rightAst <- parseExpression env localArgs rightTrimmed
-                    Right $ BinOp (astFindOperation op) [leftAst, rightAst]
-            Nothing -> parseAtom env localArgs trimmedExpr
-
+       else parseComparison env localArgs trimmedExpr
 
 buildBodyAsts :: [Ast] -> [Ast] -> [String] -> ParseResult
 buildBodyAsts env localArgs rawLines =
