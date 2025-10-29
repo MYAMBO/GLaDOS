@@ -12,7 +12,8 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
-import Parser.Data (Ast(..), Builtins(..), VariableAst(..))
+import DataTypes (Ast(..), Builtins(..), VariableAst(..))
+import Control.Monad (forM_, unless)
 import Control.Monad.State (StateT, gets, modify, runStateT, lift)
 import Control.Monad.Except (ExceptT, runExceptT, throwError, liftEither)
 
@@ -21,13 +22,21 @@ import Control.Monad.Except (ExceptT, runExceptT, throwError, liftEither)
 -- =============================================================================
 
 data CompilerState = CompilerState {
-    csBuilder    :: BB.Builder,
-    csLocalScope :: Set.Set String,
-    csArgScope   :: Map.Map String Int
+    csBuilder          :: BB.Builder,
+    csGlobalEnvBuilder :: BB.Builder,
+    csGlobalEntryCount :: Int,
+    csLocalScope       :: Set.Set String,
+    csArgScope         :: Map.Map String Int
 }
 
 initialState :: CompilerState
-initialState = CompilerState { csBuilder = mempty, csLocalScope = Set.empty, csArgScope = Map.empty }
+initialState = CompilerState {
+    csBuilder = mempty,
+    csGlobalEnvBuilder = mempty,
+    csGlobalEntryCount = 0,
+    csLocalScope = Set.empty,
+    csArgScope = Map.empty
+}
 
 type Compiler = StateT CompilerState (ExceptT String IO)
 
@@ -52,7 +61,8 @@ valTags = [ ("BoolVal", 0x01), ("Op", 0x02), ("Func", 0x03), ("Int8Val", 0x10),
 opOpcodes :: [(Builtins, Word8)]
 opOpcodes = [ (Add, 0x01), (Subtract, 0x02), (Multiply, 0x03), (Divide, 0x04),
               (Modulo, 0x05), (Neg, 0x06), (Equal, 0x07), (LessThan, 0x08),
-              (GreaterThan, 0x09), (Not, 0x0A), (And, 0x0B), (Or, 0x0C), (Xor, 0x0D) ]
+              (GreaterThan, 0x09), (Not, 0x0A), (And, 0x0B), (Or, 0x0C), (Xor, 0x0D),
+              (Cons, 0x0E), (Car, 0x0F), (Cdr, 0x10), (EmptyList, 0x11) ]
 
 -- =============================================================================
 -- BYTECODE EMITTER HELPERS
@@ -60,6 +70,8 @@ opOpcodes = [ (Add, 0x01), (Subtract, 0x02), (Multiply, 0x03), (Divide, 0x04),
 
 emit :: BB.Builder -> Compiler ()
 emit b = modify $ \s -> s { csBuilder = csBuilder s <> b }
+emitGlobal :: BB.Builder -> Compiler ()
+emitGlobal b = modify $ \s -> s { csGlobalEnvBuilder = csGlobalEnvBuilder s <> b }
 emitB :: Word8 -> Compiler ()
 emitB = emit . BB.word8
 emitI32 :: Int -> Compiler ()
@@ -78,21 +90,29 @@ emitInstruction name emitArgs = do
     opcode <- findOpcode name opcodes "instruction"
     emitB opcode
     emitArgs
-emitPushVal :: VariableAst -> Compiler ()
-emitPushVal val = emitInstruction "Push" $ do
+emitValueBuilder :: VariableAst -> Compiler BB.Builder
+emitValueBuilder val =
     case val of
-        Int8 v   -> findOpcode "Int8Val" valTags "value tag" >>= emitB >> emit (BB.int8 v)
-        Int16 v  -> findOpcode "Int16Val" valTags "value tag" >>= emitB >> emit (BB.int16BE v)
-        Int32 v  -> findOpcode "Int32Val" valTags "value tag" >>= emitB >> emit (BB.int32BE v)
-        Int64 v  -> findOpcode "Int64Val" valTags "value tag" >>= emitB >> emit (BB.int64BE v)
-        UInt8 v  -> findOpcode "Word8Val" valTags "value tag" >>= emitB >> emit (BB.word8 v)
-        UInt16 v -> findOpcode "Word16Val" valTags "value tag" >>= emitB >> emit (BB.word16BE v)
-        UInt32 v -> findOpcode "Word32Val" valTags "value tag" >>= emitB >> emit (BB.word32BE v)
-        UInt64 v -> findOpcode "Word64Val" valTags "value tag" >>= emitB >> emit (BB.word64BE v)
-        Float v  -> findOpcode "FltVal" valTags "value tag" >>= emitB >> emit (BB.floatBE v)
-        Double v -> findOpcode "DblVal" valTags "value tag" >>= emitB >> emit (BB.doubleBE v)
-        Bool v   -> findOpcode "BoolVal" valTags "value tag" >>= emitB >> emitB (if v then 1 else 0)
-        _ -> throwError $ "Compiler Error: Pushing string literals is not directly supported."
+        Int8 v    -> tagBuilder "Int8Val" (BB.int8 v)
+        Int16 v   -> tagBuilder "Int16Val" (BB.int16BE v)
+        Int32 v   -> tagBuilder "Int32Val" (BB.int32BE v)
+        Int64 v   -> tagBuilder "Int64Val" (BB.int64BE v)
+        UInt8 v   -> tagBuilder "Word8Val" (BB.word8 v)
+        UInt16 v  -> tagBuilder "Word16Val" (BB.word16BE v)
+        UInt32 v  -> tagBuilder "Word32Val" (BB.word32BE v)
+        UInt64 v  -> tagBuilder "Word64Val" (BB.word64BE v)
+        Float v   -> tagBuilder "FltVal" (BB.floatBE v)
+        Double v  -> tagBuilder "DblVal" (BB.doubleBE v)
+        Bool v    -> tagBuilder "BoolVal" (BB.word8 (if v then 1 else 0))
+        _ -> throwError $ "Compiler Error: Global definition for this literal type is not supported."
+    where
+      tagBuilder name payload = do
+        tag <- findOpcode name valTags "value tag"
+        return $ BB.word8 tag <> payload
+emitPushVal :: VariableAst -> Compiler ()
+emitPushVal val = do
+    builder <- emitValueBuilder val
+    emitInstruction "Push" (emit builder)
 emitBuiltinOp :: Builtins -> Compiler ()
 emitBuiltinOp builtin = emitInstruction "Push" $ do
     opTag <- findOpcode "Op" valTags "value tag"
@@ -104,34 +124,31 @@ emitBuiltinOp builtin = emitInstruction "Push" $ do
 -- MAIN COMPILER LOGIC
 -- =============================================================================
 
+compileGlobalDefine :: String -> Ast -> Compiler ()
+compileGlobalDefine name ast = do
+    isDefined <- gets (Set.member name . csLocalScope)
+    if isDefined then throwError $ "Redefinition of global identifier: '" ++ name ++ "'"
+    else do
+        modify $ \s -> s { csLocalScope = Set.insert name (csLocalScope s) }
+        valueBuilder <- case ast of
+            (Lambda args (Symbol _) body) -> do
+                (functionBytecode, _) <- compileLambda args body
+                funcTag <- findOpcode "Func" valTags "value tag"
+                let lenBuilder = BB.int32BE (fromIntegral $ BL.length functionBytecode)
+                return $ BB.word8 funcTag <> lenBuilder <> BB.lazyByteString functionBytecode
+            (Literal val) -> emitValueBuilder val
+            _ -> throwError $ "Global definitions must be functions or constant literals. Found: " ++ show ast
+        emitGlobal $ BB.int32BE (fromIntegral $ length name) <> BB.stringUtf8 name <> valueBuilder
+        modify $ \s -> s { csGlobalEntryCount = csGlobalEntryCount s + 1 }
+
 compileTransformedOp :: Ast -> Ast -> Builtins -> Builtins -> Compiler ()
 compileTransformedOp argA argB innerOp outerOp = do
-    emitBuiltinOp outerOp; emitBuiltinOp innerOp
-    compileAst argA; compileAst argB
-    emitInstruction "Call" (emitI32 2)
+    emitBuiltinOp outerOp
+    compileAst (BinOp innerOp [argA, argB])
     emitInstruction "Call" (emitI32 1)
 
 compileAst :: Ast -> Compiler ()
-compileAst (Define name (Lambda args (Symbol _) body)) = do
-    isDefined <- gets (Set.member name . csLocalScope)
-    if isDefined then throwError $ "Function redefinition: '" ++ name ++ "'"
-    else do
-        (functionBytecode, _) <- compileLambda args body
-        emitInstruction "Push" $ do
-            funcTag <- findOpcode "Func" valTags "value tag"
-            emitB funcTag
-            emitI32 (fromIntegral $ BL.length functionBytecode)
-            emit (BB.lazyByteString functionBytecode)
-        emitInstruction "Define" (emitString name)
-        modify $ \s -> s { csLocalScope = Set.insert name (csLocalScope s) }
-
-compileAst (Define name ast) = do
-    isDefined <- gets (Set.member name . csLocalScope)
-    if isDefined then throwError $ "Variable redefinition: '" ++ name ++ "'"
-    else do
-        compileAst ast
-        emitInstruction "Define" (emitString name)
-        modify $ \s -> s { csLocalScope = Set.insert name (csLocalScope s) }
+compileAst (Define name ast) = compileGlobalDefine name ast
 
 compileAst (Literal val) = emitPushVal val
 
@@ -151,8 +168,9 @@ compileAst (Call func argsAst) = do
 
 compileAst (BinOp op args) = do
     let (requiredArity, argNodes) = case op of
-            Not -> (1, args); Neg -> (1, args); _ -> (2, args)
-    if length args /= requiredArity then throwError $ "Operation '" ++ show op ++ "' expects " ++ show requiredArity ++ " args."
+            Not -> (1, args); Neg -> (1, args); Car -> (1, args); Cdr -> (1, args)
+            _ -> (2, args)
+    if length args /= requiredArity then throwError $ "Operation '" ++ show op ++ "' expects " ++ show requiredArity ++ " args, but got " ++ show (length args)
     else
         case op of
             NotEqual           -> compileTransformedOp (head argNodes) (argNodes !! 1) Equal Not
@@ -174,7 +192,17 @@ compileAst (If cond thenBranch elseBranch) = do
     emitInstruction "Jump" (emitI32 elseSize)
     emit elseBuilder
 
-compileAst ast = throwError $ "AST node not yet supported: " ++ show ast
+compileAst (LiteralList _ elements) = do
+    emitBuiltinOp EmptyList
+    emitInstruction "Call" (emitI32 0)
+    forM_ (reverse elements) compileListElement
+    where
+      compileListElement element = do
+        emitBuiltinOp Cons
+        compileAst element
+        emitInstruction "Call" (emitI32 2)
+
+compileAst ast = throwError $ "AST node not yet supported in this context: " ++ show ast
 
 compileLambda :: [Ast] -> Ast -> Compiler (BL.ByteString, [String])
 compileLambda args body = do
@@ -184,7 +212,7 @@ compileLambda args body = do
     argNames <- liftEither $ mapM extractArgName args
     let argMap = Map.fromList $ zip argNames [0..]
     let lambdaLocalScope = foldr Set.insert savedScope argNames
-    let tempState = CompilerState mempty lambdaLocalScope argMap
+    let tempState = CompilerState mempty mempty 0 lambdaLocalScope argMap
     let bodyCompiler = compileAst body >> (findOpcode "Return" opcodes "instruction" >>= emitB)
     result <- lift $ lift $ runCompiler bodyCompiler tempState
     case result of
@@ -196,35 +224,43 @@ compileBranch :: Ast -> Compiler BB.Builder
 compileBranch branch = do
     savedScope <- gets csLocalScope
     savedArgScope <- gets csArgScope
-    let tempState = CompilerState mempty savedScope savedArgScope
+    let tempState = CompilerState mempty mempty 0 savedScope savedArgScope
     result <- lift $ lift $ runCompiler (compileAst branch) tempState
     case result of
         Right (_, finalState) -> return $ csBuilder finalState
         Left err -> throwError $ "Error in branch compilation: " ++ err
 
-compileSequence :: [Ast] -> Compiler ()
-compileSequence [] = return ()
-compileSequence [lastAst] = compileAst lastAst
-compileSequence (ast:rest) = do
-    compileAst ast
-    case ast of
-        Define _ _ -> return ()
-        _          -> findOpcode "Pop" opcodes "instruction" >>= emitB
-    compileSequence rest
-
 -- =============================================================================
 -- TOP-LEVEL COMPILER FUNCTION
 -- =============================================================================
 
+isMainFunc :: Ast -> Bool
+isMainFunc (Define "main" (Lambda {})) = True
+isMainFunc _ = False
+
 compile :: [Ast] -> IO (Either String BL.ByteString)
-compile asts = do
-    let compileProg = compileSequence asts >> findOpcode "Return" opcodes "instruction" >>= emitB
-    result <- runCompiler compileProg initialState
-    case result of
-        Left err -> return $ Left err
-        Right (_, finalState) -> do
-            let header = BB.word32BE 0x42414B41 <> BB.word32BE 2
-            let globalEnv = BB.word32BE 0
-            let codeBody = csBuilder finalState
-            let finalBytecode = BB.toLazyByteString $ header <> globalEnv <> codeBody
-            return $ Right finalBytecode
+compile asts =
+    if not (any isMainFunc asts)
+    then return $ Left "Compilation failed: 'main' function is not defined."
+    else do
+        let initialStateForGlobals = initialState
+        let globalCompiler = forM_ asts $ \ast ->
+                case ast of
+                    Define name defAst -> compileGlobalDefine name defAst
+                    _ -> throwError "Top-level statements must be definitions."
+        globalsResult <- runCompiler globalCompiler initialStateForGlobals
+        case globalsResult of
+            Left err -> return $ Left err
+            Right (_, globalsState) -> do
+                let entryPointCompiler = compileAst (Call (Symbol "main") []) >> (findOpcode "Return" opcodes "instruction" >>= emitB)
+                let entryPointState = initialState { csLocalScope = csLocalScope globalsState }
+                entryPointResult <- runCompiler entryPointCompiler entryPointState
+                case entryPointResult of
+                    Left err -> return $ Left err
+                    Right (_, entryPointFinalState) -> do
+                        let header = BB.word32BE 0x42414B41 <> BB.word32BE 2
+                        let globalCount = BB.int32BE (fromIntegral $ csGlobalEntryCount globalsState)
+                        let globalEnv = csGlobalEnvBuilder globalsState
+                        let codeBody = csBuilder entryPointFinalState
+                        let finalBytecode = BB.toLazyByteString $ header <> globalCount <> globalEnv <> codeBody
+                        return $ Right finalBytecode
