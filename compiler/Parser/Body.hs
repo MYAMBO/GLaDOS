@@ -8,12 +8,12 @@
 module Parser.Body where
 
 import Parsing
-import DataTypes -- Assurez-vous que ce nom est correct
+import DataTypes
 import Parser.Tools
-import Data.Maybe (isJust, fromMaybe)
 import Text.Read (readMaybe)
 import Data.Char (isAlphaNum, ord)
 import Control.Applicative ((<|>))
+import Data.Maybe (isJust, fromMaybe)
 import Data.List (find, isPrefixOf, uncons, unsnoc)
 
 type ParseResult = Either String Ast
@@ -34,8 +34,6 @@ parseBodyHeader = do
 -- LOGIQUE D'ANALYSE D'EXPRESSION AVEC PRIORITÉ DES OPÉRATEURS
 -- =============================================================================
 
--- Cette fonction utilitaire est la clé. Elle trouve le DERNIER opérateur
--- d'une liste donnée, en ignorant ce qui est entre parenthèses.
 findLastOpWorker :: String -> [String] -> Int -> Maybe (String, Int) -> String -> Maybe (String, Int)
 findLastOpWorker _ _ _ bestOp [] = bestOp
 findLastOpWorker originalStr ops level bestOp (c:cs) =
@@ -44,7 +42,6 @@ findLastOpWorker originalStr ops level bestOp (c:cs) =
                    ')' -> level - 1
                    _   -> level
       currentPos = length originalStr - length (c:cs)
-      -- On met à jour `bestOp` seulement si on n'est pas dans des parenthèses.
       newBestOp  = if level == 0
                    then case find (`isPrefixOf` (c:cs)) ops of
                           Just foundOp -> Just (foundOp, currentPos)
@@ -61,7 +58,6 @@ findLastOp str ops =
           right = drop (length op) rightWithOp
       in Just (op, left, right)
 
--- PARSEURS D'ATOMES (Unités de base)
 parseCharLiteral :: String -> Maybe ParseResult
 parseCharLiteral s =
     case s of
@@ -112,9 +108,6 @@ parseFunctionCall env localArgs s =
           argsAsts <- traverse (parseExpression env localArgs) (words trimmedRest)
           return $ Call (Symbol name) argsAsts
 
--- HIÉRARCHIE DE PARSING (de la plus haute à la plus basse priorité)
-
--- Niveau 4 : Facteurs (parenthèses et atomes)
 parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
 parseFactor env localArgs s =
   let trimmed = trimLine s
@@ -125,7 +118,6 @@ parseFactor env localArgs s =
            _ -> Left $ "Syntax error: Unterminated parenthesis in expression \"" ++ trimmed ++ "\""
        _ -> parseAtom env localArgs trimmed
 
--- Niveau 3 : Termes (multiplication, division)
 parseTerm :: [Ast] -> [Ast] -> String -> ParseResult
 parseTerm env localArgs s =
   case findLastOp s ["*", "/", "%"] of
@@ -135,7 +127,6 @@ parseTerm env localArgs s =
       Right $ BinOp (astFindOperation op) [leftAst, rightAst]
     Nothing -> parseFactor env localArgs s
 
--- Niveau 2 : Expressions additives
 parseAddition :: [Ast] -> [Ast] -> String -> ParseResult
 parseAddition env localArgs s =
   case findLastOp s ["+", "-"] of
@@ -148,7 +139,6 @@ parseAddition env localArgs s =
         Right $ BinOp (astFindOperation op) [leftAst, rightAst]
     Nothing -> parseTerm env localArgs s
 
--- Niveau 1 : Expressions de comparaison
 parseComparison :: [Ast] -> [Ast] -> String -> ParseResult
 parseComparison env localArgs s =
   case findLastOp s ["==", "!=", "<", ">", "<=", ">="] of
@@ -158,7 +148,6 @@ parseComparison env localArgs s =
       Right $ BinOp (astFindOperation op) [leftAst, rightAst]
     Nothing -> parseAddition env localArgs s
 
--- Le point d'entrée principal pour l'analyse d'expression
 parseExpression :: [Ast] -> [Ast] -> String -> ParseResult
 parseExpression env localArgs s =
     let trimmed = trimLine s
@@ -245,7 +234,7 @@ fillBody env funcName rawBodyLines =
   if not (isDefinedFunc env funcName)
   then Left $ "Function \"" ++ funcName ++ "\" is not defined."
   else
-    let localArgs = getFuncArgs env funcName
+    let localArgs = getFuncArgs env (removeSpaces funcName)
     in case buildBodyAsts env localArgs rawBodyLines of
       Left err -> Left $ "Error in body of function '" ++ funcName ++ "': " ++ err
       Right bodyAst -> Right $ map (patchFuncBody funcName bodyAst) env
