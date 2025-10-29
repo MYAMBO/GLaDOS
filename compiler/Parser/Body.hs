@@ -8,11 +8,10 @@
 module Parser.Body where
 
 import Parsing
-import Parser.Data
+import DataTypes
 import Parser.Tools
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromMaybe)
 import Text.Read (readMaybe)
-import Data.Maybe (fromMaybe)
 import Data.Char (isAlphaNum, ord)
 import Control.Applicative ((<|>))
 import Data.List (find, isPrefixOf, uncons, unsnoc)
@@ -25,9 +24,62 @@ data ScanState = ScanState {
 }
 
 -- =============================================================================
--- HEADER PARSING IMPLEMENTATION
+-- PARSING IMPLEMENTATION (Logique réécrite pour les corps de fonction)
 -- =============================================================================
 
+buildBodyAsts :: [Ast] -> [Ast] -> [String] -> ParseResult
+buildBodyAsts env localArgs rawLines =
+    let (ifBlocks, elseBlock) = splitIfElseBlocks rawLines
+    in if null elseBlock
+       then Left "Syntax error: A function body must end with a mandatory 'any' pattern match (e.g., '-> expression')."
+       else buildIfChain env localArgs ifBlocks elseBlock
+
+buildIfChain :: [Ast] -> [Ast] -> [(String, [String])] -> [String] -> ParseResult
+buildIfChain env localArgs [] elseLines = do
+    elseExprs <- traverse (parseExpression env localArgs) elseLines
+    case elseExprs of
+        []           -> Left "The final 'else' block of a function body cannot be empty."
+        [singleExpr] -> Right singleExpr
+        _            -> Right $ List elseExprs
+
+buildIfChain env localArgs ((condStr, thenLines):restIfs) finalElseLines = do
+    conditionAst <- if null condStr
+                    then Right $ Literal (Bool True)
+                    else parseExpression env localArgs condStr
+
+    thenExprs <- if null thenLines
+                 then Left "Missing expression after '->' in if-then statement."
+                 else traverse (parseExpression env localArgs) thenLines
+
+    let thenAst = case thenExprs of
+                    [singleExpr] -> singleExpr
+                    _            -> List thenExprs
+
+    elseAst <- buildIfChain env localArgs restIfs finalElseLines
+    Right $ If conditionAst thenAst elseAst
+
+-- LOGIQUE CORRIGÉE pour distinguer `cond ->` de `->`
+splitIfElseBlocks :: [String] -> ([(String, [String])], [String])
+splitIfElseBlocks [] = ([], [])
+splitIfElseBlocks (l:ls) =
+    case breakOnArrow (trimLine l) of
+        Just (conditionPart, thenPartStr) ->
+            -- Si la partie condition est vide, c'est le début du bloc "any"/else.
+            if null conditionPart then
+                let allElseLines = if null thenPartStr then ls else thenPartStr : ls
+                in ([], allElseLines)
+            -- Sinon, c'est une vraie condition "if".
+            else
+                let (thisThenLinesRaw, remainingLs) = collectUntilNextIf ls
+                    thisThenLines = if null thenPartStr then thisThenLinesRaw else thenPartStr : thisThenLinesRaw
+                    (nextIfBlocks, finalElseBlock) = splitIfElseBlocks remainingLs
+                in ((conditionPart, thisThenLines) : nextIfBlocks, finalElseBlock)
+        -- Si pas de flèche, ça fait partie du bloc précédent ou du bloc else final.
+        Nothing -> ([], l:ls)
+
+-- =============================================================================
+-- LE RESTE DU FICHIER EST INCHANGÉ
+-- =============================================================================
 
 parseBodyHeader :: Parser String
 parseBodyHeader = do
@@ -36,11 +88,6 @@ parseBodyHeader = do
   funcName <- parseAnyCharExcept "\n"
   _ <- parseMany (parseAnyChar " \t\n")
   return funcName
-
-
--- =============================================================================
--- BODY PARSING IMPLEMENTATION
--- =============================================================================
 
 parseFunctionCall :: [Ast] -> [Ast] -> String -> ParseResult
 parseFunctionCall env localArgs s =
@@ -138,45 +185,6 @@ parseExpression env localArgs exprString =
                     rightAst <- parseExpression env localArgs rightTrimmed
                     Right $ BinOp (astFindOperation op) [leftAst, rightAst]
             Nothing -> parseAtom env localArgs trimmedExpr
-
-
-buildBodyAsts :: [Ast] -> [Ast] -> [String] -> ParseResult
-buildBodyAsts env localArgs rawLines =
-    let (ifBlocks, elseBlock) = splitIfElseBlocks rawLines
-    in if null ifBlocks && null elseBlock
-       then Left "Function body cannot be empty or contain only whitespace."
-       else buildIfChain env localArgs ifBlocks elseBlock
-
-buildIfChain :: [Ast] -> [Ast] -> [(String, [String])] -> [String] -> ParseResult
-buildIfChain _ _ [] [] = Right $ List []
-buildIfChain env localArgs [] elseLines = do
-    exprs <- traverse (parseExpression env localArgs) elseLines
-    Right $ case exprs of
-        [singleExpr] -> singleExpr
-        _            -> List exprs
-buildIfChain env localArgs ((condStr, thenLines):restIfBlocks) finalElseLines = do
-    conditionAst <- if null condStr
-                    then Right $ Literal (Bool True)
-                    else parseExpression env localArgs condStr
-    thenExprs <- if null thenLines
-                 then Left "Missing expression after '->' in if-then statement."
-                 else traverse (parseExpression env localArgs) thenLines
-    let thenAst = case thenExprs of
-                    [singleExpr] -> singleExpr
-                    _            -> List thenExprs
-    elseAst <- buildIfChain env localArgs restIfBlocks finalElseLines
-    Right $ If conditionAst thenAst elseAst
-
-splitIfElseBlocks :: [String] -> ([(String, [String])], [String])
-splitIfElseBlocks [] = ([], [])
-splitIfElseBlocks (l:ls) =
-    case breakOnArrow (trimLine l) of
-        Just (conditionPart, thenPartStr) ->
-            let (thisThenLinesRaw, remainingLs) = collectUntilNextIf ls
-                thisThenLines = if null thenPartStr then thisThenLinesRaw else thenPartStr : thisThenLinesRaw
-                (nextIfBlocks, finalElseBlock) = splitIfElseBlocks remainingLs
-            in ((conditionPart, thisThenLines) : nextIfBlocks, finalElseBlock)
-        Nothing -> ([], l:ls)
 
 isIfLine :: String -> Bool
 isIfLine s = isJust (breakOnArrow (trimLine s))

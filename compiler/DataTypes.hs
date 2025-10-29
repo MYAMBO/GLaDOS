@@ -5,7 +5,7 @@
 -- Data
 -}
 
-module Parser.Data where
+module DataTypes where
 
 import Text.Read (readMaybe)
 import Data.Int (Int8, Int16, Int32, Int64)
@@ -56,7 +56,7 @@ parseLiteral (UInt8 _) s  = fmap UInt8 (readMaybe s)
 parseLiteral (Float _) s  = fmap Float (readMaybe s)
 parseLiteral (Double _) s = fmap Double (readMaybe s)
 parseLiteral (Bool _) s   = fmap Bool (readMaybe s)
-parseLiteral (String _) s = Just (String s)
+parseLiteral (String _) _ = Nothing -- Un string n'est plus un littéral primitif
 
 astFindOperation :: String -> Builtins
 astFindOperation "=="   = Equal
@@ -86,7 +86,7 @@ data VariableAst = Int8 Int8
                  | Float Float
                  | Double Double
                  | Bool Bool
-                 | String String
+                 | String String -- Gardé pour les déclarations de type, mais n'est plus un littéral
   deriving (Show, Eq)
 
 data Builtins = Equal
@@ -106,9 +106,14 @@ data Builtins = Equal
               | Not
               | Xor
               | UnknownOp
+              -- OPÉRATIONS DE LISTE AJOUTÉES POUR LE COMPILATEUR
+              | Cons
+              | Car
+              | Cdr
+              | EmptyList
   deriving (Show, Eq)
 
-data Ast = Var VariableAst String -- variable type and name
+data Ast = Var VariableAst String
          | Literal VariableAst
          | List [Ast]
          | BinOp Builtins [Ast]
@@ -116,5 +121,6 @@ data Ast = Var VariableAst String -- variable type and name
          | If Ast Ast Ast
          | Call Ast [Ast]
          | Symbol String
-         | Lambda [Ast] Ast Ast -- arguments, return type, body
+         | Lambda [Ast] Ast Ast
+         | LiteralList String [Ast] -- NOUVEAU: Pour les listes littérales comme [1, 2] et "hello"
   deriving (Show, Eq)

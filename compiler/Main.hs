@@ -7,7 +7,7 @@
 
 module Main where
 
-import Parser.Data
+import DataTypes
 import Compiler (compile)
 import Parser.Constructor
 import Debug.Trace (trace)
@@ -47,7 +47,7 @@ main = do
                     putStrLn "\n❌ Compilation Failed:"
                     putStrLn compileError
                 Right bytecode -> do
-                    let outputFilename = "output.gdbc"
+                    let outputFilename = "output.bin"
                     putStrLn $ "\n✅ Compilation Successful!"
                     BL.writeFile outputFilename bytecode
                     putStrLn $ "Bytecode written to '" ++ outputFilename ++ "'"

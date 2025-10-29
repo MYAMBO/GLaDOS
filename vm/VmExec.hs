@@ -153,21 +153,24 @@ applyBinaryOp intOp fltOp dblOp v1 v2 stack
             _ -> Left $ "Error: Type mismatch. Cannot operate on " ++ show v1 ++ " and " ++ show v2
 
 execOp :: Op -> Stack -> Either String Stack
-execOp Add (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a + b)) (\a b -> FltVal (a + b)) (\a b -> DblVal (a + b)) v1 v2 stack
-execOp Sub (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a - b)) (\a b -> FltVal (a - b)) (\a b -> DblVal (a - b)) v1 v2 stack
-execOp Mul (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a * b)) (\a b -> FltVal (a * b)) (\a b -> DblVal (a * b)) v1 v2 stack
-execOp Div (v2:v1:stack) =
-    case (valToDouble v1, valToDouble v2) of
-        (Just d1, Just d2) | d2 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ DblVal (d1 / d2) : stack
-        _ -> case (valToFloat v1, valToFloat v2) of
-            (Just f1, Just f2) | f2 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ FltVal (f1 / f2) : stack
-            _ -> case (valToInt64 v1, valToInt64 v2) of
-                (Just i1, Just i2) | i2 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ Int64Val (i1 `div` i2) : stack
-                _ -> Left $ "Error: Type mismatch for division on " ++ show v1 ++ " and " ++ show v2
+-- Commutative operations, order doesn't matter
+execOp Add (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a + b)) (\a b -> FltVal (a + b)) (\a b -> DblVal (a + b)) v2 v1 stack
+execOp Mul (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a * b)) (\a b -> FltVal (a * b)) (\a b -> DblVal (a * b)) v2 v1 stack
+execOp Eq (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) v2 v1 stack
 
-execOp Eq (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) v1 v2 stack
-execOp Lt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) v1 v2 stack
-execOp Gt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) v1 v2 stack
+-- Non-commutative operations, order matters: v2 is LHS, v1 is RHS
+execOp Sub (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a - b)) (\a b -> FltVal (a - b)) (\a b -> DblVal (a - b)) v2 v1 stack
+execOp Lt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) v2 v1 stack
+execOp Gt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) v2 v1 stack
+
+execOp Div (v2:v1:stack) =
+    case (valToDouble v2, valToDouble v1) of
+        (Just d2, Just d1) | d1 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ DblVal (d2 / d1) : stack
+        _ -> case (valToFloat v2, valToFloat v1) of
+            (Just f2, Just f1) | f1 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ FltVal (f2 / f1) : stack
+            _ -> case (valToInt64 v2, valToInt64 v1) of
+                (Just i2, Just i1) | i1 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ Int64Val (i2 `div` i1) : stack
+                _ -> Left $ "Error: Type mismatch for division on " ++ show v2 ++ " and " ++ show v1
 
 execOp Neg (v:stack) = case v of
     Int8Val n -> Right $ Int8Val (negate n) : stack; Int16Val n -> Right $ Int16Val (negate n) : stack
@@ -187,7 +190,4 @@ execOp Cdr (List (_:vs) : stack) = return $ List vs : stack
 execOp Cdr (List [] : _) = Left "Error: Cdr cannot be called on an empty list"
 execOp EmptyList stack = return $ List [] : stack
 
-execOp op []  = Left $ "Error: " ++ show op ++ " expects arguments, but the stack is empty."
-execOp op [_] = Left $ "Error: Unexpected argument count for " ++ show op ++ ". This is a fallback for operations that do not match their expected patterns; most unary operations are handled above."
-execOp op _   = Left $ "Error: Type mismatch for operation " ++ show op
 execOp op stack = Left $ "Error: Invalid arguments on stack for operation " ++ show op ++ ". Stack: " ++ show (take 3 stack)
