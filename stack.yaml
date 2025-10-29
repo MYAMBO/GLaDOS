@@ -31,7 +31,6 @@ snapshot:
 #   - wai
 
 packages:
-- .
 - compiler
 - vm
 

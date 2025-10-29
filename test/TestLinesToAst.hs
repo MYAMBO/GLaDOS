@@ -12,7 +12,7 @@ import Data.Char (ord)
 import Test.Tasty.HUnit
 
 import Parsing
-import Parser.Data
+import DataTypes
 import Parser.Body
 import Parser.Tools
 import Parser.Parse
