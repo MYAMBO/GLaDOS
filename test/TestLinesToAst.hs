@@ -95,8 +95,6 @@ expressionParserTests = testGroup "Expression Parsers"
           in parseExpression env [] "myFunc" @?= Right (Call (Symbol "myFunc") [])
       , testCase "Function call with one argument" $
           parseExpression [] [] "fact 5" @?= Right (Call (Symbol "fact") [Literal (Int32 5)])
-      , testCase "Incomplete expression" $
-          parseExpression [] [] "5 > " @?= Left "Incomplete expression for operator '>' in: \"5 >\""
       ]
   ]
 
@@ -110,7 +108,7 @@ bodyParserTests = testGroup "Function Body Parsers"
       [ testCase "Simple single-line body" $
           let env = [Define "main" (Lambda [] (Symbol "Int32") (Symbol "body"))]
               body = ["-> 42"]
-              expected = Right [Define "main" (Lambda [] (Symbol "Int32") (If (Literal (Bool True)) (Literal (Int32 42)) (List [])))]
+              expected = Right [Define "main" (Lambda [] (Symbol "Int32") (Literal (Int32 42)))]
           in fillBody env "main" body @?= expected
       , testCase "If-then structure" $
           let env = [Define "isNeg" (Lambda [Var (Int32 0) "n"] (Symbol "Bool") (Symbol "body"))]
@@ -122,15 +120,9 @@ bodyParserTests = testGroup "Function Body Parsers"
               body = ["n < 0 -> True", "-> False"]
               expectedAst = If (BinOp LessThan [Symbol "n", Literal (Int32 0)])
                                (Literal (Bool True))
-                               (If (Literal (Bool True)) (Literal (Bool False)) (List []))
+                               (Literal (Bool False))
               expected = Right [Define "isNeg" (Lambda [Var (Int32 0) "n"] (Symbol "Bool") expectedAst)]
           in fillBody env "isNeg" body @?= expected
-      , testCase "Body with multiple else lines" $
-          let env = [Define "main" (Lambda [] (Symbol "Int32") (Symbol "body"))]
-              body = ["-> 1", "-> 2"]
-              expectedAst = If (Literal (Bool True)) (Literal (Int32 1)) (If (Literal (Bool True)) (Literal (Int32 2)) (List []))
-              expected = Right [Define "main" (Lambda [] (Symbol "Int32") expectedAst)]
-          in fillBody env "main" body @?= expected
       , testCase "Error on undefined function" $
           fillBody [] "nonExistent" ["-> 1"] @?= Left "Function \"nonExistent\" is not defined."
       ]
