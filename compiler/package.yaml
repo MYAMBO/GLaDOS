@@ -8,9 +8,7 @@ dependencies:
 - binary     
 - mtl       
 - directory 
-# Fichier: compiler/package.yaml
 
-# Le nom du projet global
 name:                glados-compiler
 version:             0.1.0.0
 
