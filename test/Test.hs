@@ -8,9 +8,11 @@ import System.IO
 import Text.Printf
 
 import TestParsing (tests)
+import TestLinesToAst (testslinesToAst)
 
 main :: IO ()
 main = defaultMainWithIngredients [antXMLRunner, consoleTestReporter, listingTests] $
-  testGroup "Tests"
-    [ tests
+  testGroup "Paring Library Tests"
+    [ tests,
+      testslinesToAst
     ]
