@@ -16,13 +16,13 @@ library:
   exposed-modules:
   - Compiler
   - BytecodeConvertor
-  - Parser.Data
   - Parser.Body
   - Parser.Tools
   - Parser.Constructor
   - Parser.Define
   - Parser.Parse
   - Parsing
+  - DataTypes
 
 executables:
   glados-compiler:
