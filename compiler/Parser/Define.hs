@@ -37,3 +37,14 @@ astDefine = do
         value <- parseAnyCharExcept "\n"
         let cleanValue = removeSpaces value
         return $ Define varName (Var (addValueToVar (astFindType varType) cleanValue) varName)
+
+parseLocalDefine :: [Ast] -> [Ast] -> String -> ParseResult
+parseLocalDefine env localArgs s =
+  case breakOn "=" s of
+    (typeAndName, "=", value) ->
+      case words (trimLine typeAndName) of
+        [varType, varName] -> do
+          valueAst <- parseExpression env localArgs (trimLine value)
+          Right $ Define varName valueAst
+        _ -> Left $ "Invalid local definition syntax in: \"" ++ s ++ "\""
+    _ -> Left "Not a local definition."
