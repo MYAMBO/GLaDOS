@@ -56,7 +56,7 @@ parseLiteral (UInt8 _) s  = fmap UInt8 (readMaybe s)
 parseLiteral (Float _) s  = fmap Float (readMaybe s)
 parseLiteral (Double _) s = fmap Double (readMaybe s)
 parseLiteral (Bool _) s   = fmap Bool (readMaybe s)
-parseLiteral (String _) _ = Nothing -- Un string n'est plus un littéral primitif
+parseLiteral (String _) _ = Nothing
 
 astFindOperation :: String -> Builtins
 astFindOperation "=="   = Equal
@@ -86,7 +86,7 @@ data VariableAst = Int8 Int8
                  | Float Float
                  | Double Double
                  | Bool Bool
-                 | String String -- Gardé pour les déclarations de type, mais n'est plus un littéral
+                 | String String
   deriving (Show, Eq)
 
 data Builtins = Equal
@@ -106,7 +106,6 @@ data Builtins = Equal
               | Not
               | Xor
               | UnknownOp
-              -- OPÉRATIONS DE LISTE AJOUTÉES POUR LE COMPILATEUR
               | Cons
               | Car
               | Cdr
@@ -122,5 +121,5 @@ data Ast = Var VariableAst String
          | Call Ast [Ast]
          | Symbol String
          | Lambda [Ast] Ast Ast
-         | LiteralList String [Ast] -- NOUVEAU: Pour les listes littérales comme [1, 2] et "hello"
+         | LiteralList String [Ast]
   deriving (Show, Eq)

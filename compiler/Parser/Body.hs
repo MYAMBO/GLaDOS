@@ -2,7 +2,7 @@
 -- EPITECH PROJECT, 2025
 -- GLaDOS
 -- File description:
--- Body (Corrected and Merged)
+-- Body
 -}
 
 module Parser.Body where
@@ -164,16 +164,19 @@ splitIfElseBlocks [] = ([], [])
 splitIfElseBlocks (l:ls) =
     case breakOnArrow (trimLine l) of
         Just (conditionPart, thenPartStr) ->
-            if null conditionPart then
-                let allElseLines = if null thenPartStr then ls else thenPartStr : ls
-                in ([], allElseLines)
-            else
-                let (thisThenLinesRaw, remainingLs) = collectUntilNextIf ls
-                    thisThenLines = if null thenPartStr then thisThenLinesRaw else thenPartStr : thisThenLinesRaw
-                    (nextIfBlocks, finalElseBlock) = splitIfElseBlocks remainingLs
-                in ((conditionPart, thisThenLines) : nextIfBlocks, finalElseBlock)
+            let
+                (blockLines, remainingLs) = span (not . isIfLine) ls
+                thisThenBlock = if null thenPartStr
+                                then map trimLine blockLines
+                                else (trimLine thenPartStr) : map trimLine blockLines
+            in
+                if null conditionPart then
+                    ([], thisThenBlock ++ remainingLs)
+                else
+                    let (nextIfs, finalElse) = splitIfElseBlocks remainingLs
+                    in ((conditionPart, thisThenBlock) : nextIfs, finalElse)
+        
         Nothing -> ([], l:ls)
-
 breakOnArrow :: String -> Maybe (String, String)
 breakOnArrow s = case breakOn "->" s of (pre, "->", post) -> Just (trimLine pre, trimLine post); _ -> Nothing
 
@@ -189,16 +192,15 @@ collectUntilNextIf (l:ls)
 buildIfChain :: [Ast] -> [Ast] -> [(String, [String])] -> [String] -> ParseResult
 buildIfChain _ _ [] [] = Right $ List []
 buildIfChain env localArgs [] elseLines = do
-    exprs <- traverse (parseExpression env localArgs) elseLines
-    Right $ case exprs of [singleExpr] -> singleExpr; _ -> List exprs
+    parseBlock env localArgs elseLines
 buildIfChain env localArgs ((condStr, thenLines):restIfs) finalElseLines = do
     conditionAst <- if null condStr
                     then Right $ Literal (Bool True)
                     else parseExpression env localArgs condStr
-    thenExprs <- if null thenLines
-                 then Left "Missing expression after '->' in if-then statement."
-                 else traverse (parseExpression env localArgs) thenLines
-    let thenAst = case thenExprs of [singleExpr] -> singleExpr; _ -> List thenExprs
+    thenAst <- if null thenLines
+                 then Left "Missing expression or statement after '->'."
+                 else parseBlock env localArgs thenLines
+
     elseAst <- buildIfChain env localArgs restIfs finalElseLines
     Right $ If conditionAst thenAst elseAst
 
@@ -243,3 +245,38 @@ patchFuncBody :: String -> Ast -> Ast -> Ast
 patchFuncBody name bodyAst (Define n (Lambda args retType (Symbol "body")))
   | n == name = Define n (Lambda args retType bodyAst)
 patchFuncBody _ _ other = other
+
+parseLocalDefine :: [Ast] -> [Ast] -> String -> ParseResult
+parseLocalDefine env localArgs s =
+  case breakOn "=" s of
+    (typeAndName, "=", value) ->
+      case words (trimLine typeAndName) of
+        [varType, varName] -> do
+          valueAst <- parseExpression env localArgs (trimLine value)
+          Right $ Define varName valueAst
+        _ -> Left $ "Invalid local definition syntax in: \"" ++ s ++ "\""
+    _ -> Left "Not a local definition."
+
+parseStatement :: [Ast] -> [Ast] -> String -> ParseResult
+parseStatement env localArgs s =
+  let trimmed = trimLine s
+  in
+    if "->" `isPrefixOf` trimmed then
+      Left "Unexpected '->' at the start of a statement inside a block."
+    else
+      case parseLocalDefine env localArgs s of
+        Right ast -> Right ast
+        Left _ -> parseExpression env localArgs s
+
+parseBlock :: [Ast] -> [Ast] -> [String] -> ParseResult
+parseBlock _ _ [] = Right (List [])
+parseBlock env localArgs [line] = parseStatement env localArgs line
+parseBlock env localArgs (line:restLines) = do
+    stmt <- parseStatement env localArgs line
+    let newLocalArgs = case stmt of
+                         Define name _ -> (Var (String "") name) : localArgs
+                         _             -> localArgs
+    restAst <- parseBlock env newLocalArgs restLines
+    case restAst of
+      List restStmts -> Right $ List (stmt : restStmts)
+      singleStmt     -> Right $ List [stmt, singleStmt]
