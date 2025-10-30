@@ -140,7 +140,8 @@ word32ToFloat  :: Word32 -> Float  ; word32ToFloat  = unsafeCoerce
 word64ToDouble :: Word64 -> Double ; word64ToDouble = unsafeCoerce
 
 hex2 :: Word8 -> String
-hex2 w = let s="0123456789ABCDEF"; a=fromIntegral (w `div` 16); b=fromIntegral (w `mod` 16) in [s!!a, s!!b]
+hex2 w = let s="0123456789ABCDEF"; a=fromIntegral (w `div` 16); b=fromIntegral (w `mod` 16)
+         in [s!!a, s!!b]
 
 ------------------------------------------------------------
 -- AST
@@ -158,17 +159,49 @@ data Expr
 
 data Top
   = TVar (Maybe String) String Expr
-  | TFunc String [String] Expr
+  | TFunc String [String] Expr   -- name, params, body
   | TExpr Expr
   deriving (Eq, Show)
 
 lit :: String -> String -> Expr
 lit t s = ELit (Lit t s)
 
-inferType :: Expr -> Maybe String
-inferType (ELit (Lit t _)) = Just t
-inferType _                = Nothing
+inferTypeShallow :: Expr -> Maybe String
+inferTypeShallow (ELit (Lit t _)) = Just t
+inferTypeShallow _                = Nothing
 
+-- Deep-ish type inference. We mostly care about Int32 for now.
+inferExprTypeDeep :: Expr -> Maybe String
+inferExprTypeDeep (ELit (Lit t _)) = Just t
+inferExprTypeDeep (EVar _)         = Nothing
+inferExprTypeDeep (ECall f args)   = unify (inferExprTypeDeep f : map inferExprTypeDeep args)
+inferExprTypeDeep (EBin _ xs)      = unify (map inferExprTypeDeep xs)
+inferExprTypeDeep (EIf _ t e)      = unify [inferExprTypeDeep t, inferExprTypeDeep e]
+
+unify :: [Maybe String] -> Maybe String
+unify = foldl pick Nothing
+  where
+    pick :: Maybe String -> Maybe String -> Maybe String
+    pick Nothing y = y
+    pick x Nothing = x
+    pick (Just a) (Just b)
+      | a == b    = Just a
+      | otherwise = Just a  -- arbitrary but stable
+
+-- rename variables in an Expr according to a mapping,
+-- e.g. [("a0","n")] turns EVar "a0" into EVar "n"
+substExpr :: [(String, String)] -> Expr -> Expr
+substExpr env = go where
+  go (EVar v) =
+    case lookup v env of
+      Just v' -> EVar v'
+      Nothing -> EVar v
+  go (ELit l)        = ELit l
+  go (EBin o xs)     = EBin o (map go xs)
+  go (ECall f args)  = ECall (go f) (map go args)
+  go (EIf c t e)     = EIf (go c) (go t) (go e)
+
+-- normalize negations etc.
 normalize :: Expr -> Expr
 normalize (EBin Not [x]) = case normalize x of
   EBin Eq [a,b] -> EBin NE [a,b]
@@ -181,15 +214,16 @@ normalize (ECall f as) = ECall (normalize f) (map normalize as)
 normalize x            = x
 
 ------------------------------------------------------------
--- Value skipping helpers (byte-count semantics)
+-- Value / func body helpers
 ------------------------------------------------------------
 
--- Skip payload for a value after its tag, using *byte* sizes.
 skipAfterTag :: Word8 -> Cur -> Either String Cur
 skipAfterTag tag c = case tag of
   t | t == tagBool -> snd <$> getU8 c
     | t == tagOp   -> snd <$> getU8 c
-    | t == tagFunc -> do (n, c1) <- getI32BE c; (_, c2) <- takeN (fromIntegral n) c1; pure c2
+    | t == tagFunc -> do (n, c1) <- getI32BE c
+                         (_, c2) <- takeN (fromIntegral n) c1
+                         pure c2
     | t == tagI8   -> snd <$> getU8 c
     | t == tagI16  -> snd <$> getU16BE c
     | t == tagI32  -> snd <$> getU32BE c
@@ -216,14 +250,34 @@ parseEnvValAsTop name c0 = do
   (tag, c1) <- getU8 c0
   case tag of
     t | t == tagFunc -> do
-          (body, c2) <- readFuncValBody c1
-          let cur = Cur body 0
-              lim = BL.length body
-          (e, argc, _) <- deExpr cur lim
-          let params = [ "a" ++ show i | i <- [0 .. argc - 1] ]
-          pure (Just (TFunc name params e), c2)
-      | t == tagOp   -> do (_b, c2) <- getU8 c1; pure (Nothing, c2)
-      | otherwise    -> do c2 <- skipAfterTag t c1; pure (Nothing, c2)
+          (bodyBytes, c2) <- readFuncValBody c1
+
+          -- decode bodyBytes as expression
+          let curBody = Cur bodyBytes 0
+              bodyLen = BL.length bodyBytes
+          (rawBodyExpr, rawArgc, _) <- deExpr curBody bodyLen
+
+          -- choose pretty parameter names
+          let paramNamesRaw = [ "a" ++ show i | i <- [0 .. rawArgc - 1] ]
+              paramNamesPretty =
+                case paramNamesRaw of
+                  ["a0"] -> ["n"]   -- heuristic: single arg becomes "n"
+                  xs     -> xs
+
+              mapping = zip paramNamesRaw paramNamesPretty
+              bodyExprPretty = substExpr mapping rawBodyExpr
+
+          -- build final TFunc with pretty names
+          pure (Just (TFunc name paramNamesPretty bodyExprPretty), c2)
+
+      | t == tagOp -> do
+          -- env op entries, not top-level funcs/vars we want to render
+          (_b, c2) <- getU8 c1
+          pure (Nothing, c2)
+
+      | otherwise -> do
+          c2 <- skipAfterTag t c1
+          pure (Nothing, c2)
 
 parseEnv :: Cur -> Either String ([Top], Cur)
 parseEnv c0 = do
@@ -248,13 +302,17 @@ pushE :: SI -> Est -> Est
 pushE x e = e { stk = x : stk e }
 
 popE :: Est -> Either String (SI, Est)
-popE e = case stk e of [] -> Left "Stack underflow"; (x:xs) -> Right (x, e { stk = xs })
+popE e = case stk e of
+  []     -> Left "Stack underflow"
+  (x:xs) -> Right (x, e { stk = xs })
 
 popExpr :: Est -> Either String (Expr, Est)
-popExpr e = do (si, e') <- popE e
-               case si of SV v -> Right (v, e'); _ -> Left "Expected expr"
+popExpr e = do
+  (si, e') <- popE e
+  case si of
+    SV v -> Right (v, e')
+    _    -> Left "Expected expr"
 
--- deExpr parses *up to* 'lim' bytes starting at 'c0'
 deExpr :: Cur -> Int64 -> Either String (Expr, Int, Cur)
 deExpr c0 lim = go c0 0 emptyEst
   where
@@ -263,6 +321,7 @@ deExpr c0 lim = go c0 0 emptyEst
       (SV v:_) -> Right (normalize v, max 0 (maxArg e + 1), Cur BL.empty (off c0 + lim))
       _        -> Left "Empty expression"
 
+    bump :: Int64 -> Int64 -> Int64
     bump n m = m + n
 
     go :: Cur -> Int64 -> Est -> Either String (Expr, Int, Cur)
@@ -276,7 +335,8 @@ deExpr c0 lim = go c0 0 emptyEst
                   case tag of
                     _ | tag == tagBool -> do
                           (b, c3) <- getU8 c2
-                          go c3 (bump 3 used) (pushE (SV (lit "Bool" (if b == 0 then "false" else "true"))) est)
+                          go c3 (bump 3 used)
+                             (pushE (SV (lit "Bool" (if b == 0 then "false" else "true"))) est)
 
                       | tag == tagOp -> do
                           (b, c3) <- getU8 c2
@@ -337,13 +397,15 @@ deExpr c0 lim = go c0 0 emptyEst
             _ | op == opcPushFromArgs -> do
                   (ix, c2) <- getI32BE c1
                   let nm = "a" ++ show ix
-                  go c2 (bump 5 used) (pushE (SV (EVar nm)) est { maxArg = max (maxArg est) ix })
+                  go c2 (bump 5 used)
+                     (pushE (SV (EVar nm)) est { maxArg = max (maxArg est) ix })
 
               | op == opcPushFromEnv -> do
                   ((nm, nB), c2) <- getString c1
-                  go c2 (bump (1 + 4 + nB) used) (pushE (SV (EVar nm)) est)
+                  go c2 (bump (1 + 4 + nB) used)
+                     (pushE (SV (EVar nm)) est)
 
-              | op == opcCall || op == opcTailCall -> do
+              | op == (opcCall) || op == (opcTailCall) -> do
                   (arity, c2) <- getI32BE c1
                   (args, est1) <- popN arity est
                   (fn, est2)   <- popE est1
@@ -356,12 +418,14 @@ deExpr c0 lim = go c0 0 emptyEst
               | op == opcJumpIfFalse -> do
                   (offB, c2) <- getI32BE c1
                   (cond, est1) <- popExpr est
-                  let thenSize = offB - 5  -- bytes: THEN block size before the following JUMP +4
+                  -- offB includes: THEN bytes + (1 byte jump opcode + 4 bytes else size)
+                  let thenSize = offB - 5
                   if thenSize < 0
                     then Left "Bad JumpIfFalse"
                     else do
                       (thenBs, afterThen) <- takeN (fromIntegral thenSize) c2
                       (thenE, _, _) <- deExpr (Cur thenBs (off c2)) (BL.length thenBs)
+
                       (jmp, cJ) <- getU8 afterThen
                       if jmp /= opcJump
                         then Left "Expected Jump"
@@ -369,8 +433,10 @@ deExpr c0 lim = go c0 0 emptyEst
                           (elseSz, cE0) <- getI32BE cJ
                           (elseBs, rest) <- takeN (fromIntegral elseSz) cE0
                           (elseE, _, _) <- deExpr (Cur elseBs (off cE0)) (BL.length elseBs)
+
                           let e' = EIf cond thenE elseE
-                          go (Cur (input rest) (off rest)) used (pushE (SV e') est1)
+                          go (Cur (input rest) (off rest)) used
+                             (pushE (SV e') est1)
 
               | op == opcJump -> do
                   (n, c2) <- getI32BE c1
@@ -400,30 +466,41 @@ deExpr c0 lim = go c0 0 emptyEst
 
     popN :: Int -> Est -> Either String ([Expr], Est)
     popN 0 e = Right ([], e)
-    popN n e = do (xs, e1) <- popN (n - 1) e; (a, e2) <- popExpr e1; pure (a:xs, e2)
+    popN n e = do
+      (xs, e1) <- popN (n - 1) e
+      (a, e2)  <- popExpr e1
+      pure (a:xs, e2)
 
 ------------------------------------------------------------
--- Top-level decoder (also bytes for jumps)
+-- Top-level decoder (rare but kept)
 ------------------------------------------------------------
 
 data Tst = Tst { tstk :: [SI], tout :: [Top] } deriving (Show)
 emptyT :: Tst; emptyT = Tst [] []
+
 pushT :: SI -> Tst -> Tst
 pushT x t = t { tstk = x : tstk t }
 
 popT :: Tst -> Either String (SI, Tst)
-popT t = case tstk t of [] -> Left "Stack underflow"; (x:xs) -> Right (x, t { tstk = xs })
+popT t = case tstk t of
+  []     -> Left "Stack underflow"
+  (x:xs) -> Right (x, t { tstk = xs })
 
 popExprT :: Tst -> Either String (Expr, Tst)
-popExprT t = do (si, t') <- popT t
-                case si of SV v -> Right (v, t'); _ -> Left "Expected expr"
+popExprT t = do
+  (si, t') <- popT t
+  case si of
+    SV v -> Right (v, t')
+    _    -> Left "Expected expr"
 
 deTop :: Cur -> Int64 -> Either String ([Top], Cur)
 deTop c0 lim = go c0 0 emptyT
   where
     finish :: Tst -> Either String ([Top], Cur)
-    finish t = Right (reverse (tout t), c0 { input = BL.drop lim (input c0), off = off c0 + lim })
+    finish t = Right (reverse (tout t), c0 { input = BL.drop lim (input c0)
+                                           , off   = off c0 + lim })
 
+    bump :: Int64 -> Int64 -> Int64
     bump n m = m + n
 
     go :: Cur -> Int64 -> Tst -> Either String ([Top], Cur)
@@ -437,7 +514,8 @@ deTop c0 lim = go c0 0 emptyT
                   case tag of
                     _ | tag == tagBool -> do
                           (b, c3) <- getU8 c2
-                          go c3 (bump 3 used) (pushT (SV (lit "Bool" (if b == 0 then "false" else "true"))) st)
+                          go c3 (bump 3 used)
+                             (pushT (SV (lit "Bool" (if b == 0 then "false" else "true"))) st)
 
                       | tag == tagOp -> do
                           (b, c3) <- getU8 c2
@@ -497,11 +575,13 @@ deTop c0 lim = go c0 0 emptyT
 
             _ | op == opcPushFromArgs -> do
                   (ix, c2) <- getI32BE c1
-                  go c2 (bump 5 used) (pushT (SV (EVar ("a" ++ show ix))) st)
+                  go c2 (bump 5 used)
+                     (pushT (SV (EVar ("a" ++ show ix))) st)
 
               | op == opcPushFromEnv -> do
                   ((nm, nB), c2) <- getString c1
-                  go c2 (bump (1 + 4 + nB) used) (pushT (SV (EVar nm)) st)
+                  go c2 (bump (1 + 4 + nB) used)
+                     (pushT (SV (EVar nm)) st)
 
               | op == opcCall || op == opcTailCall -> do
                   (arity, c2) <- getI32BE c1
@@ -520,17 +600,27 @@ deTop c0 lim = go c0 0 emptyT
                       let cur = Cur bs 0
                           len = BL.length bs
                       (body, argc, _) <- deExpr cur len
-                      let params = [ "a" ++ show i | i <- [0 .. argc - 1] ]
-                      go c2 (bump (1 + 4 + nB) used) (emit (TFunc nm params body) st { tstk = rest })
+                      -- pretty arg names
+                      let rawParams    = [ "a" ++ show i | i <- [0 .. argc - 1] ]
+                          prettyParams =
+                            case rawParams of
+                              ["a0"] -> ["n"]
+                              xs     -> xs
+                          mapping = zip rawParams prettyParams
+                          body'   = substExpr mapping body
+                      go c2 (bump (1 + 4 + nB) used)
+                        (emit (TFunc nm prettyParams body') st { tstk = rest })
                     _ -> do
                       (rhs, st1) <- popExprT st
-                      go c2 (bump (1 + 4 + nB) used) (emit (TVar (inferType rhs) nm rhs) st1)
+                      go c2 (bump (1 + 4 + nB) used)
+                        (emit (TVar (inferTypeShallow rhs) nm rhs) st1)
 
               | op == opcAssign -> do
                   ((nm, nB), c2) <- getString c1
                   (rhs, st1)     <- popExprT st
                   let asnTop = TExpr (ECall (EVar ":=") [EVar nm, rhs])
-                  go c2 (bump (1 + 4 + nB) used) (emit asnTop st1)
+                  go c2 (bump (1 + 4 + nB) used)
+                     (emit asnTop st1)
 
               | op == opcJumpIfFalse -> do
                   (offB, c2)  <- getI32BE c1
@@ -541,6 +631,7 @@ deTop c0 lim = go c0 0 emptyT
                     else do
                       (thenBs, afterThen) <- takeN (fromIntegral thenSize) c2
                       (tE, _, _)          <- deExpr (Cur thenBs (off c2)) (BL.length thenBs)
+
                       (jmp, cJ) <- getU8 afterThen
                       if jmp /= opcJump
                         then Left "Expected Jump"
@@ -548,7 +639,8 @@ deTop c0 lim = go c0 0 emptyT
                           (elseSz, cE0) <- getI32BE cJ
                           (elseBs, rest) <- takeN (fromIntegral elseSz) cE0
                           (eE, _, _) <- deExpr (Cur elseBs (off cE0)) (BL.length elseBs)
-                          let st'   = pushT (SV (EIf cond tE eE)) st1
+
+                          let st' = pushT (SV (EIf cond tE eE)) st1
                           go (Cur (input rest) (off rest)) used st'
 
               | op == opcPop -> do
@@ -563,7 +655,8 @@ deTop c0 lim = go c0 0 emptyT
                   (_, rest) <- takeN (fromIntegral n) c2
                   go (Cur (input rest) (off rest)) used st
 
-              | otherwise -> Left ("Unknown opcode: 0x" ++ hex2 op)
+              | otherwise ->
+                  Left ("Unknown opcode: 0x" ++ hex2 op)
 
     emit :: Top -> Tst -> Tst
     emit a t = t { tout = a : tout t }
@@ -576,23 +669,36 @@ deTop c0 lim = go c0 0 emptyT
       pure (a : xs, t2)
 
 ------------------------------------------------------------
--- Rendering
+-- Rendering with typed params / returns
 ------------------------------------------------------------
 
 renderProgram :: [Top] -> String
 renderProgram tops =
-  (++ "\n") . L.intercalate "\n\n" $ map renderTop defs
-  where
-    defs = [ t | t@TVar{} <- tops ] ++ [ t | t@TFunc{} <- tops ] ++ [ t | t@TExpr{} <- tops ]
+  -- order: all funcs first, then vars, then exprs
+  let fs = [ t | t@TFunc{} <- tops ]
+      vs = [ t | t@TVar{}  <- tops ]
+      es = [ t | t@TExpr{} <- tops ]
+  in (++ "\n") . L.intercalate "\n\n" $ map renderTop (fs ++ vs ++ es)
 
 renderTop :: Top -> String
-renderTop (TVar (Just ty) n e) = "define " ++ ty ++ " " ++ n ++ " = " ++ render e
-renderTop (TVar Nothing  n e)  = "define " ++ n  ++ " = " ++ render e
-renderTop (TFunc "main" ps body) =
-  "func main<" ++ L.intercalate ", " ps ++ "> => Any\n\n" ++ renderGuards "main" body
+renderTop (TVar (Just ty) n e) =
+  "define " ++ ty ++ " " ++ n ++ " = " ++ render e
+renderTop (TVar Nothing  n e)  =
+  "define " ++ n  ++ " = " ++ render e
+
 renderTop (TFunc nm ps body) =
-  "func " ++ nm ++ "<" ++ L.intercalate ", " ps ++ "> => Any\n\n" ++ renderGuards nm body
-renderTop (TExpr e) = render e
+  let retTy   = inferExprTypeDeep body           -- e.g. Just "Int32"
+      showTy  = maybe "Any" id retTy             -- default Any
+      psTyped = case retTy of
+                  Just t  -> L.intercalate ", " [ t ++ " " ++ p | p <- ps ]
+                  Nothing -> L.intercalate ", " ps
+      header =
+        "func " ++ nm ++ "<" ++ psTyped ++ "> => " ++ showTy
+      bodyBlk = renderGuards nm body
+  in header ++ "\n\n" ++ bodyBlk
+
+renderTop (TExpr e) =
+  render e
 
 renderGuards :: String -> Expr -> String
 renderGuards n e =
@@ -600,8 +706,14 @@ renderGuards n e =
   where
     clause (Just c, t)  = "    " ++ render c ++ " -> " ++ render t
     clause (Nothing, t) = "    -> " ++ render t
+
+    guards :: Expr -> [(Maybe Expr, Expr)]
     guards (EIf c t f)  = (Just c, t) : guards f
     guards x            = [(Nothing, x)]
+
+------------------------------------------------------------
+-- Expr pretty-printer
+------------------------------------------------------------
 
 render :: Expr -> String
 render = go 0 . normalize
@@ -610,37 +722,66 @@ render = go 0 . normalize
     go _ (EVar s)         = s
     go _ (EBin _ [])      = "<?>"
 
-    go p (EBin o [a])     = par (p > 7) $ uSym o ++ atom a
-    go p (EBin o [a,b])   = par (p > prec o) $ go (prec o) a ++ " " ++ bSym o ++ " " ++ go (prec o) b
+    -- unary
+    go p (EBin o [a]) =
+      par (p > 7) $ uSym o ++ atom a
+
+    -- binary
+    go p (EBin o [a,b]) =
+      par (p > prec o) $ go (prec o) a ++ " " ++ bSym o ++ " " ++ go (prec o) b
+
+    -- n-ary (shouldn't really happen in your code except maybe chains)
     go p (EBin o xs@(_:_ : _ : _)) =
-      let k = prec o; pieces = map (go (k + 1)) xs
+      let k = prec o
+          pieces = map (go (k + 1)) xs
       in par (p > k) (L.intercalate (" " ++ bSym o ++ " ") pieces)
 
-    go _ (ECall f [])     = go 9 f
-    go p (ECall f as)     = par (p > 8) $ L.intercalate " " (go 8 f : map arg as)
+    -- calls
+    go _ (ECall f []) = go 9 f
+    go p (ECall f as) =
+      par (p > 8) $ L.intercalate " " (go 8 f : map arg as)
 
-    go p (EIf c t e)      = par (p > 0) $ "if " ++ go 0 c ++ " then " ++ go 0 t ++ " else " ++ go 0 e
+    -- inline if
+    go p (EIf c t e) =
+      par (p > 0) $
+        "if " ++ go 0 c ++ " then " ++ go 0 t ++ " else " ++ go 0 e
 
     arg, atom :: Expr -> String
-    arg  x = case x of EVar _ -> go 9 x; ELit _ -> go 9 x; _ -> "(" ++ go 0 x ++ ")"
+    arg x = case x of
+      EVar _ -> go 9 x
+      ELit _ -> go 9 x
+      _      -> "(" ++ go 0 x ++ ")"
     atom = arg
 
+    par :: Bool -> String -> String
     par True  s = "(" ++ s ++ ")"
     par False s = s
 
+    -- operator precedence (bigger = tighter)
     prec :: Op -> Int
     prec o = case o of
-      Or  -> 1; And -> 2; Xor -> 2
-      Eq  -> 3; NE  -> 3
-      Lt  -> 4; LE  -> 4; Gt -> 4; GE -> 4
-      Add -> 5; Sub -> 5
-      Mul -> 6; Div -> 6; Mod -> 6
+      Or  -> 1
+      And -> 2
+      Xor -> 2
+      Eq  -> 3
+      NE  -> 3
+      Lt  -> 4
+      LE  -> 4
+      Gt  -> 4
+      GE  -> 4
+      Add -> 5
+      Sub -> 5
+      Mul -> 6
+      Div -> 6
+      Mod -> 6
       _   -> 6
 
+    uSym :: Op -> String
     uSym Neg = "-"
     uSym Not = "!"
     uSym _   = "<?>"
 
+    bSym :: Op -> String
     bSym Add = "+"
     bSym Sub = "-"
     bSym Mul = "*"
@@ -667,12 +808,14 @@ decompileToString bs = do
   (m, c1) <- getU32BE c0
   if m /= magicNumber then Left "Bad magic" else do
     (v, c2) <- getU32BE c1
-    if v /= currentVersion then Left ("Unsupported version: " ++ show v) else do
-      (envTops, c3) <- parseEnv c2
-      let code = input c3
-          len  = BL.length code
-      (tops, _) <- deTop (Cur code (off c3)) len
-      pure (renderProgram (envTops ++ tops))
+    if v /= currentVersion
+      then Left ("Unsupported version: " ++ show v)
+      else do
+        (envTops, c3) <- parseEnv c2
+        let code = input c3
+            len  = BL.length code
+        (tops, _) <- deTop (Cur code (off c3)) len
+        pure (renderProgram (envTops ++ tops))
 
 writeDecompiled :: FilePath -> FilePath -> IO (Either String ())
 writeDecompiled inp out = do
