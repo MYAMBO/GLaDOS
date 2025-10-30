@@ -53,7 +53,7 @@ handleBody line ls env =
     Just (funcName, _) ->
       let (bodyLines, remainingLines) = collectBodyLines ls
       in
-        case fillBody env funcName bodyLines of
+        case fillBody env (removeSpaces funcName) bodyLines of
           Left err -> trace ("\n---\n[!] " ++ err ++ "\n---") []
           Right updatedEnv -> parseAllLines remainingLines updatedEnv
     Nothing -> traceError "Error: Failed to parse function body header" line env
