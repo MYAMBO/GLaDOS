@@ -2,13 +2,13 @@
 -- EPITECH PROJECT, 2025
 -- GLaDOS
 -- File description:
--- Body (Corrected and Merged)
+-- Body
 -}
 
 module Parser.Body where
 
 import Parsing
-import DataTypes -- Assurez-vous que ce nom est correct
+import DataTypes
 import Parser.Tools
 import Data.Maybe (isJust, fromMaybe)
 import Text.Read (readMaybe)
@@ -34,8 +34,6 @@ parseBodyHeader = do
 -- LOGIQUE D'ANALYSE D'EXPRESSION AVEC PRIORITÉ DES OPÉRATEURS
 -- =============================================================================
 
--- Cette fonction utilitaire est la clé. Elle trouve le DERNIER opérateur
--- d'une liste donnée, en ignorant ce qui est entre parenthèses.
 findLastOpWorker :: String -> [String] -> Int -> Maybe (String, Int) -> String -> Maybe (String, Int)
 findLastOpWorker _ _ _ bestOp [] = bestOp
 findLastOpWorker originalStr ops level bestOp (c:cs) =
@@ -44,7 +42,6 @@ findLastOpWorker originalStr ops level bestOp (c:cs) =
                    ')' -> level - 1
                    _   -> level
       currentPos = length originalStr - length (c:cs)
-      -- On met à jour `bestOp` seulement si on n'est pas dans des parenthèses.
       newBestOp  = if level == 0
                    then case find (`isPrefixOf` (c:cs)) ops of
                           Just foundOp -> Just (foundOp, currentPos)
@@ -61,7 +58,6 @@ findLastOp str ops =
           right = drop (length op) rightWithOp
       in Just (op, left, right)
 
--- PARSEURS D'ATOMES (Unités de base)
 parseCharLiteral :: String -> Maybe ParseResult
 parseCharLiteral s =
     case s of
@@ -112,9 +108,6 @@ parseFunctionCall env localArgs s =
           argsAsts <- traverse (parseExpression env localArgs) (words trimmedRest)
           return $ Call (Symbol name) argsAsts
 
--- HIÉRARCHIE DE PARSING (de la plus haute à la plus basse priorité)
-
--- Niveau 4 : Facteurs (parenthèses et atomes)
 parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
 parseFactor env localArgs s =
   let trimmed = trimLine s
@@ -125,7 +118,6 @@ parseFactor env localArgs s =
            _ -> Left $ "Syntax error: Unterminated parenthesis in expression \"" ++ trimmed ++ "\""
        _ -> parseAtom env localArgs trimmed
 
--- Niveau 3 : Termes (multiplication, division)
 parseTerm :: [Ast] -> [Ast] -> String -> ParseResult
 parseTerm env localArgs s =
   case findLastOp s ["*", "/", "%"] of
@@ -135,7 +127,6 @@ parseTerm env localArgs s =
       Right $ BinOp (astFindOperation op) [leftAst, rightAst]
     Nothing -> parseFactor env localArgs s
 
--- Niveau 2 : Expressions additives
 parseAddition :: [Ast] -> [Ast] -> String -> ParseResult
 parseAddition env localArgs s =
   case findLastOp s ["+", "-"] of
@@ -148,7 +139,6 @@ parseAddition env localArgs s =
         Right $ BinOp (astFindOperation op) [leftAst, rightAst]
     Nothing -> parseTerm env localArgs s
 
--- Niveau 1 : Expressions de comparaison
 parseComparison :: [Ast] -> [Ast] -> String -> ParseResult
 parseComparison env localArgs s =
   case findLastOp s ["==", "!=", "<", ">", "<=", ">="] of
@@ -158,7 +148,6 @@ parseComparison env localArgs s =
       Right $ BinOp (astFindOperation op) [leftAst, rightAst]
     Nothing -> parseAddition env localArgs s
 
--- Le point d'entrée principal pour l'analyse d'expression
 parseExpression :: [Ast] -> [Ast] -> String -> ParseResult
 parseExpression env localArgs s =
     let trimmed = trimLine s
@@ -175,16 +164,19 @@ splitIfElseBlocks [] = ([], [])
 splitIfElseBlocks (l:ls) =
     case breakOnArrow (trimLine l) of
         Just (conditionPart, thenPartStr) ->
-            if null conditionPart then
-                let allElseLines = if null thenPartStr then ls else thenPartStr : ls
-                in ([], allElseLines)
-            else
-                let (thisThenLinesRaw, remainingLs) = collectUntilNextIf ls
-                    thisThenLines = if null thenPartStr then thisThenLinesRaw else thenPartStr : thisThenLinesRaw
-                    (nextIfBlocks, finalElseBlock) = splitIfElseBlocks remainingLs
-                in ((conditionPart, thisThenLines) : nextIfBlocks, finalElseBlock)
+            let
+                (blockLines, remainingLs) = span (not . isIfLine) ls
+                thisThenBlock = if null thenPartStr
+                                then map trimLine blockLines
+                                else (trimLine thenPartStr) : map trimLine blockLines
+            in
+                if null conditionPart then
+                    ([], thisThenBlock ++ remainingLs)
+                else
+                    let (nextIfs, finalElse) = splitIfElseBlocks remainingLs
+                    in ((conditionPart, thisThenBlock) : nextIfs, finalElse)
+        
         Nothing -> ([], l:ls)
-
 breakOnArrow :: String -> Maybe (String, String)
 breakOnArrow s = case breakOn "->" s of (pre, "->", post) -> Just (trimLine pre, trimLine post); _ -> Nothing
 
@@ -200,16 +192,15 @@ collectUntilNextIf (l:ls)
 buildIfChain :: [Ast] -> [Ast] -> [(String, [String])] -> [String] -> ParseResult
 buildIfChain _ _ [] [] = Right $ List []
 buildIfChain env localArgs [] elseLines = do
-    exprs <- traverse (parseExpression env localArgs) elseLines
-    Right $ case exprs of [singleExpr] -> singleExpr; _ -> List exprs
+    parseBlock env localArgs elseLines
 buildIfChain env localArgs ((condStr, thenLines):restIfs) finalElseLines = do
     conditionAst <- if null condStr
                     then Right $ Literal (Bool True)
                     else parseExpression env localArgs condStr
-    thenExprs <- if null thenLines
-                 then Left "Missing expression after '->' in if-then statement."
-                 else traverse (parseExpression env localArgs) thenLines
-    let thenAst = case thenExprs of [singleExpr] -> singleExpr; _ -> List thenExprs
+    thenAst <- if null thenLines
+                 then Left "Missing expression or statement after '->'."
+                 else parseBlock env localArgs thenLines
+
     elseAst <- buildIfChain env localArgs restIfs finalElseLines
     Right $ If conditionAst thenAst elseAst
 
@@ -254,3 +245,38 @@ patchFuncBody :: String -> Ast -> Ast -> Ast
 patchFuncBody name bodyAst (Define n (Lambda args retType (Symbol "body")))
   | n == name = Define n (Lambda args retType bodyAst)
 patchFuncBody _ _ other = other
+
+parseLocalDefine :: [Ast] -> [Ast] -> String -> ParseResult
+parseLocalDefine env localArgs s =
+  case breakOn "=" s of
+    (typeAndName, "=", value) ->
+      case words (trimLine typeAndName) of
+        [varType, varName] -> do
+          valueAst <- parseExpression env localArgs (trimLine value)
+          Right $ Define varName valueAst
+        _ -> Left $ "Invalid local definition syntax in: \"" ++ s ++ "\""
+    _ -> Left "Not a local definition."
+
+parseStatement :: [Ast] -> [Ast] -> String -> ParseResult
+parseStatement env localArgs s =
+  let trimmed = trimLine s
+  in
+    if "->" `isPrefixOf` trimmed then
+      Left "Unexpected '->' at the start of a statement inside a block."
+    else
+      case parseLocalDefine env localArgs s of
+        Right ast -> Right ast
+        Left _ -> parseExpression env localArgs s
+
+parseBlock :: [Ast] -> [Ast] -> [String] -> ParseResult
+parseBlock _ _ [] = Right (List [])
+parseBlock env localArgs [line] = parseStatement env localArgs line
+parseBlock env localArgs (line:restLines) = do
+    stmt <- parseStatement env localArgs line
+    let newLocalArgs = case stmt of
+                         Define name _ -> (Var (String "") name) : localArgs
+                         _             -> localArgs
+    restAst <- parseBlock env newLocalArgs restLines
+    case restAst of
+      List restStmts -> Right $ List (stmt : restStmts)
+      singleStmt     -> Right $ List [stmt, singleStmt]
