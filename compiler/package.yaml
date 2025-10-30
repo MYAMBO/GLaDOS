@@ -1,21 +1,50 @@
-name: glados-compiler
-version: 0.1.0.0
+name:                glados-compiler
+version:             0.1.0.0
 
 dependencies:
-  - base >= 4.7 && < 5
-  - binary
-  - bytestring
-  - containers
-  - mtl
-  - directory
+- base >= 4.7 && < 5
+- containers
+- bytestring
+- binary     
+- mtl       
+- directory 
+
+library:
+  source-dirs:
+  - .
+  - ../Parsing
+  exposed-modules:
+  - Compiler
+  - BytecodeConvertor
+  - Parser.Body
+  - Parser.Tools
+  - Parser.Constructor
+  - Parser.Define
+  - Parser.Parse
+  - Parsing
+  - DataTypes
 
 executables:
   glados-compiler:
-    main: Main.hs
-    source-dirs:
-      - .
-      - ../Parsing
+    main:                Main.hs
+    source-dirs:         .
     ghc-options:
-      - -Wall
-      - -Wextra
-      - -threaded
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - glados-compiler
+
+
+tests:
+  glados-compiler-test:
+    main:                Test.hs
+    source-dirs:         ../test
+    ghc-options:
+    - -threaded
+    - -fhpc
+    dependencies:
+    - glados-compiler
+    - tasty
+    - tasty-hunit
+    - tasty-ant-xml

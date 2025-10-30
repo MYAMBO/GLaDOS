@@ -7,7 +7,7 @@
 
 module Parser.Define where
 
-import Parser.Data
+import DataTypes
 import Parsing
 import Debug.Trace (trace)
 import Parser.Tools (lotSpaceToOne, trim)
