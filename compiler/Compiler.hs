@@ -138,6 +138,7 @@ compileGlobalDefine name ast = do
                 let lenBuilder = BB.int32BE (fromIntegral $ BL.length functionBytecode)
                 return $ BB.word8 funcTag <> lenBuilder <> BB.lazyByteString functionBytecode
             (Literal val) -> emitValueBuilder val
+            (Var val _) -> emitValueBuilder val  -- Handle global variables defined as Var nodes
             _ -> throwError $ "Global definitions must be functions or constant literals. Found: " ++ show ast
         emitGlobal $ BB.int32BE (fromIntegral $ length name) <> BB.stringUtf8 name <> valueBuilder
         modify $ \s -> s { csGlobalEntryCount = csGlobalEntryCount s + 1 }

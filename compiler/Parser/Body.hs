@@ -82,6 +82,7 @@ parseSymbolOrCall env localArgs s
     | ' ' `elem` s || '(' `elem` s = parseFunctionCall env localArgs s
     | isDefinedFunc env s          = Right $ Call (Symbol s) []
     | isLocalArg localArgs s       = Right $ Symbol s
+    | isGlobalVar env s            = Right $ Symbol s
     | otherwise                    = Left $ "Error: Use of undeclared function or variable '" ++ s ++ "'"
 
 parseAtom :: [Ast] -> [Ast] -> String -> ParseResult
@@ -224,6 +225,15 @@ isLocalArg :: [Ast] -> String -> Bool
 isLocalArg args name = any isMatchingArg args where
     isMatchingArg (Var _ varName) = varName == name
     isMatchingArg _ = False
+
+isGlobalVar :: [Ast] -> String -> Bool
+isGlobalVar env name = any isGlobalVarDef env where
+    isGlobalVarDef (Define varName val) = varName == name && isNotFunction val
+    isGlobalVarDef _ = False
+
+isNotFunction :: Ast -> Bool
+isNotFunction (Lambda _ _ _) = False
+isNotFunction _ = True
 
 getFuncArgs :: [Ast] -> String -> [Ast]
 getFuncArgs env funcName = case find isMatchingFunc env of
