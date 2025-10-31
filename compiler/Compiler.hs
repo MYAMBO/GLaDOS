@@ -16,6 +16,7 @@ import DataTypes (Ast(..), Builtins(..), VariableAst(..))
 import Control.Monad (forM_, unless)
 import Control.Monad.State (StateT, gets, modify, runStateT, lift)
 import Control.Monad.Except (ExceptT, runExceptT, throwError, liftEither)
+import Data.List (partition)
 
 -- =============================================================================
 -- COMPILER STATE AND MONAD
@@ -201,6 +202,30 @@ compileAst (LiteralList _ elements) = do
         emitBuiltinOp Cons
         compileAst element
         emitInstruction "Call" (emitI32 2)
+
+compileAst (List []) = return ()  -- Empty list does nothing
+
+compileAst (List [singleAst]) = compileAst singleAst  -- Single item in list is just that item
+
+compileAst (List statements) = do
+    compileStatements statements
+  where
+    compileStatements [] = return ()
+    compileStatements [lastStmt] = compileAst lastStmt  -- Last statement is the return value
+    compileStatements (stmt:rest) = do
+        case stmt of
+            Define varName varValueAst -> do
+                -- Handle local variable definition
+                compileAst varValueAst  -- Compile the value
+                -- Add variable to local scope in compiler state
+                modify $ \s -> s { csLocalScope = Set.insert varName (csLocalScope s) }
+                -- Emit the define instruction to store the value
+                emitInstruction "Define" (emitString varName)
+            _ -> do
+                -- Handle other statements (expressions)
+                compileAst stmt  -- Compile the statement
+                emitInstruction "Pop" (return ())  -- Discard result
+        compileStatements rest  -- Process remaining statements
 
 compileAst ast = throwError $ "AST node not yet supported in this context: " ++ show ast
 
