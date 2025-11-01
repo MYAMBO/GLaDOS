@@ -12,6 +12,7 @@ import Data.Int (Int8, Int16, Int32, Int64)
 import Data.Word (Word8, Word16, Word32, Word64)
 
 toEither :: Maybe (Ast, String) -> Either String Ast
+toEither (Just (Define _ (Var (String "error") _), _)) = Left "Parse Error"
 toEither (Just (ast, _)) = Right ast
 toEither Nothing = Left "Parse error"
 
