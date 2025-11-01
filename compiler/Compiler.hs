@@ -14,7 +14,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Builder as BB
 import DataTypes (Ast(..), Builtins(..), VariableAst(..))
 import Control.Monad (forM_, unless)
-import Control.Monad.State (StateT, gets, modify, runStateT, lift)
+import Control.Monad.State (StateT, gets, modify, runStateT, lift, get)
 import Control.Monad.Except (ExceptT, runExceptT, throwError, liftEither)
 import Data.List (partition)
 
@@ -42,7 +42,7 @@ runCompiler comp st = runExceptT $ runStateT comp st
 
 opcodes :: [(String, Word8)]
 opcodes = [ ("Push", 0x01), ("Pop", 0x02), ("Return", 0x03), ("Jump", 0x04),
-            ("JumpIfFalse", 0x05), ("Call", 0x06), ("PushFromArgs", 0x08),
+            ("JumpIfFalse", 0x05), ("Call", 0x06), ("TailCall", 0x07), ("PushFromArgs", 0x08),
             ("PushFromEnv", 0x09), ("Define", 0x0A), ("Assign", 0x0B) ]
 
 valTags :: [(String, Word8)]
@@ -130,15 +130,19 @@ compileGlobalDefine name ast = do
 compileTransformedOp :: Ast -> Ast -> Builtins -> Builtins -> Compiler ()
 compileTransformedOp argA argB innerOp outerOp = do
     emitBuiltinOp outerOp
-    compileAst (BinOp innerOp [argA, argB])
+    compileAst (BinOp innerOp [argA, argB]) False  -- Always False for internal op calls
     emitInstruction "Call" (emitI32 1)
 
-compileAst :: Ast -> Compiler ()
-compileAst (Define name ast) = compileGlobalDefine name ast
+-- Add context for tail calls
+type TailContext = Bool
+type TailAstCompiler = Ast -> TailContext -> Compiler ()
 
-compileAst (Literal val) = emitPushVal val
+compileAst :: TailAstCompiler
+compileAst (Define name ast) _ = compileGlobalDefine name ast
 
-compileAst (Symbol name) = do
+compileAst (Literal val) _ = emitPushVal val
+
+compileAst (Symbol name) _ = do
     argIndex <- gets (Map.lookup name . csArgScope)
     case argIndex of
         Just index -> emitInstruction "PushFromArgs" (emitI32 index)
@@ -147,12 +151,14 @@ compileAst (Symbol name) = do
             if isLocal then emitInstruction "PushFromEnv" (emitString name)
             else throwError $ "Undefined variable: '" ++ name ++ "'"
 
-compileAst (Call func argsAst) = do
-    compileAst func
-    mapM_ compileAst argsAst
-    emitInstruction "Call" (emitI32 (length argsAst))
+compileAst (Call func argsAst) inTailContext = do
+    compileAst func False  -- Function name is never in tail position
+    mapM_ (\arg -> compileAst arg False) argsAst  -- Arguments are never in tail position
+    if inTailContext
+        then emitInstruction "TailCall" (emitI32 (length argsAst))
+        else emitInstruction "Call" (emitI32 (length argsAst))
 
-compileAst (BinOp op args) = do
+compileAst (BinOp op args) inTailContext = do
     let (requiredArity, argNodes) = case op of
             Not -> (1, args); Neg -> (1, args); Car -> (1, args); Cdr -> (1, args)
             _ -> (2, args)
@@ -164,74 +170,86 @@ compileAst (BinOp op args) = do
             GreaterThanOrEqual -> compileTransformedOp (head argNodes) (argNodes !! 1) LessThan Not
             _ -> do
                 emitBuiltinOp op
-                mapM_ compileAst argNodes
-                emitInstruction "Call" (emitI32 requiredArity)
+                mapM_ (\arg -> compileAst arg False) argNodes  -- Arguments are never in tail position
+                if inTailContext
+                    then emitInstruction "TailCall" (emitI32 requiredArity)
+                    else emitInstruction "Call" (emitI32 requiredArity)
 
-compileAst (If cond thenBranch elseBranch) = do
-    compileAst cond
-    thenBuilder <- compileBranch thenBranch
+compileAst (If cond thenBranch elseBranch) inTailContext = do
+    compileAst cond False  -- Condition is never in tail position
+    thenBuilder <- compileBranch thenBranch inTailContext
     let thenSize = fromIntegral $ BL.length $ BB.toLazyByteString thenBuilder
-    elseBuilder <- compileBranch elseBranch
+    elseBuilder <- compileBranch elseBranch inTailContext
     let elseSize = fromIntegral $ BL.length $ BB.toLazyByteString elseBuilder
     emitInstruction "JumpIfFalse" (emitI32 (thenSize + 5))
     emit thenBuilder
     emitInstruction "Jump" (emitI32 elseSize)
     emit elseBuilder
 
-compileAst (LiteralList _ elements) = do
+compileAst (LiteralList _ elements) inTailContext = do
     emitBuiltinOp EmptyList
     emitInstruction "Call" (emitI32 0)
     forM_ (reverse elements) compileListElement
     where
       compileListElement element = do
         emitBuiltinOp Cons
-        compileAst element
+        compileAst element False  -- List elements are never in tail position
         emitInstruction "Call" (emitI32 2)
 
-compileAst (List []) = return ()
+compileAst (List []) _ = return ()
 
-compileAst (List [singleAst]) = compileAst singleAst
+compileAst (List [singleAst]) inTailContext = compileAst singleAst inTailContext
 
-compileAst (List statements) = do
-    compileStatements statements
+compileAst (List statements) inTailContext = do
+    compileStatements statements inTailContext
   where
-    compileStatements [] = return ()
-    compileStatements [lastStmt] = compileAst lastStmt
-    compileStatements (stmt:rest) = do
+    compileStatements [] _ = return ()
+    compileStatements [lastStmt] True = compileAst lastStmt True
+    compileStatements [lastStmt] False = compileAst lastStmt False
+    compileStatements (stmt:rest) inTailContext = do
         case stmt of
             Define varName varValueAst -> do
-                compileAst varValueAst
+                compileAst varValueAst False  -- Definition values are never in tail position
                 modify $ \s -> s { csLocalScope = Set.insert varName (csLocalScope s) }
                 emitInstruction "Define" (emitString varName)
             _ -> do
-                compileAst stmt
+                compileAst stmt False
                 emitInstruction "Pop" (return ())
-        compileStatements rest
+        compileStatements rest inTailContext
 
-compileAst ast = throwError $ "AST node not yet supported in this context: " ++ show ast
+compileAst ast _ = throwError $ "AST node not yet supported in this context: " ++ show ast
 
 compileLambda :: [Ast] -> Ast -> Compiler (BL.ByteString, [String])
 compileLambda args body = do
-    savedScope <- gets csLocalScope
+    currentState <- get
     let extractArgName (Var _ name) = Right name
         extractArgName _ = Left "Invalid AST for lambda argument; expected Var _ name."
     argNames <- liftEither $ mapM extractArgName args
     let argMap = Map.fromList $ zip argNames [0..]
-    let lambdaLocalScope = foldr Set.insert savedScope argNames
-    let tempState = CompilerState mempty mempty 0 lambdaLocalScope argMap
-    let bodyCompiler = compileAst body >> (findOpcode "Return" opcodes "instruction" >>= emitB)
+    let lambdaLocalScope = foldr Set.insert (csLocalScope currentState) argNames
+    let tempState = currentState {
+        csBuilder = mempty,              -- Fresh bytecode builder for this function
+        csGlobalEnvBuilder = mempty,     -- Don't carry over global env builder
+        csLocalScope = lambdaLocalScope, -- New scope with function's args
+        csArgScope = argMap              -- Map of argument names to indices
+        -- Global entry count and other global state preserved
+    }
+    let bodyCompiler = compileAst body True >> (findOpcode "Return" opcodes "instruction" >>= emitB)
     result <- lift $ lift $ runCompiler bodyCompiler tempState
     case result of
         Left err -> throwError $ "Error compiling lambda body: " ++ err
         Right (_, finalState) ->
             return (BB.toLazyByteString $ csBuilder finalState, argNames)
 
-compileBranch :: Ast -> Compiler BB.Builder
-compileBranch branch = do
-    savedScope <- gets csLocalScope
-    savedArgScope <- gets csArgScope
-    let tempState = CompilerState mempty mempty 0 savedScope savedArgScope
-    result <- lift $ lift $ runCompiler (compileAst branch) tempState
+compileBranch :: Ast -> Bool -> Compiler BB.Builder
+compileBranch branch inTailContext = do
+    currentState <- get
+    -- Create temp state preserving global environment info but with fresh builders for this branch
+    let tempState = currentState {
+        csBuilder = mempty,
+        csGlobalEnvBuilder = mempty
+    }
+    result <- lift $ lift $ runCompiler (compileAst branch inTailContext) tempState
     case result of
         Right (_, finalState) -> return $ csBuilder finalState
         Left err -> throwError $ "Error in branch compilation: " ++ err
@@ -254,7 +272,7 @@ compile asts =
         case globalsResult of
             Left err -> return $ Left err
             Right (_, globalsState) -> do
-                let entryPointCompiler = compileAst (Call (Symbol "main") []) >> (findOpcode "Return" opcodes "instruction" >>= emitB)
+                let entryPointCompiler = compileAst (Call (Symbol "main") []) False >> (findOpcode "Return" opcodes "instruction" >>= emitB)
                 let entryPointState = initialState { csLocalScope = csLocalScope globalsState }
                 entryPointResult <- runCompiler entryPointCompiler entryPointState
                 case entryPointResult of

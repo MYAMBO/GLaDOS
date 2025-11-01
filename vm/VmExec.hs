@@ -90,6 +90,14 @@ exec args globalEnv bytecode stack = exec' [] bytecode stack where
               exec' localEnv nextBytes (res:deeperStack)
           [] -> Left "Error: Corrupted stack, function not found"
 
+  handleInstruction _ (TailCall argCount) remainingBytes stack = do
+      when (length stack < argCount + 1) $
+          Left "Error: TailCall stack underflow"
+      let (argsPopped, funcAndRest) = splitAt argCount stack
+      case funcAndRest of
+          (func:_) -> execCall argCount func globalEnv (reverse argsPopped) []  -- Tail call: reuse current args and return value directly
+          [] -> Left "Error: Corrupted stack, function not found for TailCall"
+
   handleInstruction _ instr _ _ = Left $ "Instruction not yet implemented in VM: " ++ show instr
 
 
