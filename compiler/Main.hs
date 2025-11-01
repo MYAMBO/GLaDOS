@@ -47,9 +47,6 @@ main = do
                     putStrLn "\n❌ Compilation Failed:"
                     putStrLn compileError
                 Right bytecode -> do
-                    let outputFilename = "output.bin"
+                    let outputFilename = "out.cake"
                     putStrLn $ "\n✅ Compilation Successful!"
-                    BL.writeFile outputFilename bytecode
                     putStrLn $ "Bytecode written to '" ++ outputFilename ++ "'"
-                    putStrLn "\nTo run the test, use the following command:"
-                    putStrLn $ "  ./glados-vm " ++ outputFilename
