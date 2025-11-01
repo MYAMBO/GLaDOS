@@ -95,19 +95,28 @@ parseFunctionCall env localArgs s =
   let (name, rest) = span isAlphaNum s
       trimmedRest = trimLine rest
   in
-    if null name || null trimmedRest then
-      Left $ "Invalid function call syntax for: \"" ++ s ++ "\""
-    else
-      case uncons trimmedRest of
-        Just ('(', middleAndLast) ->
-          case unsnoc middleAndLast of
-            Just (middle, ')') -> do
-              argsAst <- parseExpression env localArgs middle
-              return $ Call (Symbol name) [argsAst]
-            _ -> Left $ "Syntax error: Unterminated parenthesis in function call \"" ++ s ++ "\""
-        _ -> do
-          argsAsts <- traverse (parseExpression env localArgs) (words trimmedRest)
-          return $ Call (Symbol name) argsAsts
+    if null name then
+      Left "Invalid function call: missing function name."
+    else do
+      let argStrings = splitArgsBody trimmedRest
+      argAsts <- traverse (parseExpression env localArgs) argStrings
+      Right $ Call (Symbol name) argAsts
+
+chooseSplit :: String -> Int -> String -> [String] -> [String]
+chooseSplit [] _ "" acc = reverse acc
+chooseSplit [] _ current acc = reverse (trimLine current : acc)
+chooseSplit (c:cs) level current acc
+  | c == '(' = chooseSplit cs (level + 1) (current ++ [c]) acc
+  | c == ')' = chooseSplit cs (level - 1) (current ++ [c]) acc
+  | c == ' ' && level == 0 =
+    if null (trimLine current)
+      then chooseSplit cs 0 "" acc
+      else chooseSplit cs 0 "" (trimLine current : acc)
+  | otherwise = chooseSplit cs level (current ++ [c]) acc
+
+
+splitArgsBody :: String -> [String]
+splitArgsBody s = chooseSplit (trimLine s) 0 "" []
 
 parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
 parseFactor env localArgs s =
