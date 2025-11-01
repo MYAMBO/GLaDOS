@@ -49,4 +49,5 @@ main = do
                 Right bytecode -> do
                     let outputFilename = "out.cake"
                     putStrLn $ "\n✅ Compilation Successful!"
+                    BL.writeFile outputFilename bytecode
                     putStrLn $ "Bytecode written to '" ++ outputFilename ++ "'"
