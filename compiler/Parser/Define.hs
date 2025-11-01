@@ -12,10 +12,6 @@ import Parsing
 import Debug.Trace (trace)
 import Parser.Tools (lotSpaceToOne, trim)
 
--- =============================================================================
--- DEFINE PARSING IMPLEMENTATION
--- =============================================================================
-
 parseTypeAndName :: String -> (String, String)
 parseTypeAndName s =
     let (varType, rest) = break (== ' ') s

@@ -17,11 +17,6 @@ import Debug.Trace (trace)
 
 type Env = [Ast]
 
--- =============================================================================
--- CONSTRUCTOR PARSING IMPLEMENTATION
--- =============================================================================
-
-
 isMainHere :: Env -> Bool
 isMainHere [] = True
 isMainHere env = any isMainFunc env

@@ -105,10 +105,6 @@ execCall argCount (Func program) globalEnv argsPopped _ = do
     exec (reverse argsPopped) globalEnv program []
 execCall _ val _ _ _ = Left $ "Error: Attempted to call a non-functional value: " ++ show val
 
--- =============================================================================
--- TYPE PROMOTION AND OPERATIONS
--- =============================================================================
-
 isDouble :: Val -> Bool
 isDouble (DblVal _) = True
 isDouble _          = False
@@ -153,12 +149,10 @@ applyBinaryOp intOp fltOp dblOp v1 v2 stack
             _ -> Left $ "Error: Type mismatch. Cannot operate on " ++ show v1 ++ " and " ++ show v2
 
 execOp :: Op -> Stack -> Either String Stack
--- Commutative operations, order doesn't matter
 execOp Add (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a + b)) (\a b -> FltVal (a + b)) (\a b -> DblVal (a + b)) v2 v1 stack
 execOp Mul (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a * b)) (\a b -> FltVal (a * b)) (\a b -> DblVal (a * b)) v2 v1 stack
 execOp Eq (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) v2 v1 stack
 
--- Non-commutative operations, order matters: v2 is LHS, v1 is RHS
 execOp Sub (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a - b)) (\a b -> FltVal (a - b)) (\a b -> DblVal (a - b)) v2 v1 stack
 execOp Lt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) v2 v1 stack
 execOp Gt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) v2 v1 stack

@@ -10,11 +10,6 @@ module Parser.Tools where
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
 
--- =============================================================================
--- TOOLS IMPLEMENTATION FOR PARSING
--- =============================================================================
-
-
 breakOnGo :: String -> String -> String -> (String, String, String)
 breakOnGo _ [] acc = (reverse acc, "", "")
 breakOnGo needle s@(c:cs) acc

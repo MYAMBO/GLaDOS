@@ -18,10 +18,6 @@ import Data.List (find, isPrefixOf, uncons, unsnoc)
 
 type ParseResult = Either String Ast
 
--- =============================================================================
--- PARSEUR DE HEADER DE CORPS (INCHANGÉ)
--- =============================================================================
-
 parseBodyHeader :: Parser String
 parseBodyHeader = do
   _ <- parseString "$"
@@ -29,10 +25,6 @@ parseBodyHeader = do
   funcName <- parseAnyCharExcept "\n"
   _ <- parseMany (parseAnyChar " \t\n")
   return funcName
-
--- =============================================================================
--- LOGIQUE D'ANALYSE D'EXPRESSION AVEC PRIORITÉ DES OPÉRATEURS
--- =============================================================================
 
 findLastOpWorker :: String -> [String] -> Int -> Maybe (String, Int) -> String -> Maybe (String, Int)
 findLastOpWorker _ _ _ bestOp [] = bestOp
@@ -156,10 +148,6 @@ parseExpression env localArgs s =
        then Left "Cannot parse an empty expression."
        else parseComparison env localArgs trimmed
 
--- =============================================================================
--- LOGIQUE DE CONSTRUCTION DU CORPS (IF-THEN-ELSE)
--- =============================================================================
-
 splitIfElseBlocks :: [String] -> ([(String, [String])], [String])
 splitIfElseBlocks [] = ([], [])
 splitIfElseBlocks (l:ls) =
@@ -211,10 +199,6 @@ buildBodyAsts env localArgs rawLines =
     in if null ifBlocks && null elseBlock
        then Left "Function body cannot be empty or contain only whitespace."
        else buildIfChain env localArgs ifBlocks elseBlock
-
--- =============================================================================
--- FONCTIONS D'AIDE ET API PUBLIQUE DU MODULE
--- =============================================================================
 
 isDefinedFunc :: [Ast] -> String -> Bool
 isDefinedFunc env name = any isMatchingFunc env where

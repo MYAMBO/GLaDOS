@@ -18,10 +18,6 @@ import Control.Monad.State (StateT, gets, modify, runStateT, lift)
 import Control.Monad.Except (ExceptT, runExceptT, throwError, liftEither)
 import Data.List (partition)
 
--- =============================================================================
--- COMPILER STATE AND MONAD
--- =============================================================================
-
 data CompilerState = CompilerState {
     csBuilder          :: BB.Builder,
     csGlobalEnvBuilder :: BB.Builder,
@@ -44,10 +40,6 @@ type Compiler = StateT CompilerState (ExceptT String IO)
 runCompiler :: Compiler a -> CompilerState -> IO (Either String (a, CompilerState))
 runCompiler comp st = runExceptT $ runStateT comp st
 
--- =============================================================================
--- BYTECODE DEFINITIONS
--- =============================================================================
-
 opcodes :: [(String, Word8)]
 opcodes = [ ("Push", 0x01), ("Pop", 0x02), ("Return", 0x03), ("Jump", 0x04),
             ("JumpIfFalse", 0x05), ("Call", 0x06), ("PushFromArgs", 0x08),
@@ -64,10 +56,6 @@ opOpcodes = [ (Add, 0x01), (Subtract, 0x02), (Multiply, 0x03), (Divide, 0x04),
               (Modulo, 0x05), (Neg, 0x06), (Equal, 0x07), (LessThan, 0x08),
               (GreaterThan, 0x09), (Not, 0x0A), (And, 0x0B), (Or, 0x0C), (Xor, 0x0D),
               (Cons, 0x0E), (Car, 0x0F), (Cdr, 0x10), (EmptyList, 0x11) ]
-
--- =============================================================================
--- BYTECODE EMITTER HELPERS
--- =============================================================================
 
 emit :: BB.Builder -> Compiler ()
 emit b = modify $ \s -> s { csBuilder = csBuilder s <> b }
@@ -121,10 +109,6 @@ emitBuiltinOp builtin = emitInstruction "Push" $ do
     emitB opTag
     emitB opCode
 
--- =============================================================================
--- MAIN COMPILER LOGIC
--- =============================================================================
-
 compileGlobalDefine :: String -> Ast -> Compiler ()
 compileGlobalDefine name ast = do
     isDefined <- gets (Set.member name . csLocalScope)
@@ -138,7 +122,7 @@ compileGlobalDefine name ast = do
                 let lenBuilder = BB.int32BE (fromIntegral $ BL.length functionBytecode)
                 return $ BB.word8 funcTag <> lenBuilder <> BB.lazyByteString functionBytecode
             (Literal val) -> emitValueBuilder val
-            (Var val _) -> emitValueBuilder val  -- Handle global variables defined as Var nodes
+            (Var val _) -> emitValueBuilder val
             _ -> throwError $ "Global definitions must be functions or constant literals. Found: " ++ show ast
         emitGlobal $ BB.int32BE (fromIntegral $ length name) <> BB.stringUtf8 name <> valueBuilder
         modify $ \s -> s { csGlobalEntryCount = csGlobalEntryCount s + 1 }
@@ -204,29 +188,25 @@ compileAst (LiteralList _ elements) = do
         compileAst element
         emitInstruction "Call" (emitI32 2)
 
-compileAst (List []) = return ()  -- Empty list does nothing
+compileAst (List []) = return ()
 
-compileAst (List [singleAst]) = compileAst singleAst  -- Single item in list is just that item
+compileAst (List [singleAst]) = compileAst singleAst
 
 compileAst (List statements) = do
     compileStatements statements
   where
     compileStatements [] = return ()
-    compileStatements [lastStmt] = compileAst lastStmt  -- Last statement is the return value
+    compileStatements [lastStmt] = compileAst lastStmt
     compileStatements (stmt:rest) = do
         case stmt of
             Define varName varValueAst -> do
-                -- Handle local variable definition
-                compileAst varValueAst  -- Compile the value
-                -- Add variable to local scope in compiler state
+                compileAst varValueAst
                 modify $ \s -> s { csLocalScope = Set.insert varName (csLocalScope s) }
-                -- Emit the define instruction to store the value
                 emitInstruction "Define" (emitString varName)
             _ -> do
-                -- Handle other statements (expressions)
-                compileAst stmt  -- Compile the statement
-                emitInstruction "Pop" (return ())  -- Discard result
-        compileStatements rest  -- Process remaining statements
+                compileAst stmt
+                emitInstruction "Pop" (return ())
+        compileStatements rest
 
 compileAst ast = throwError $ "AST node not yet supported in this context: " ++ show ast
 
@@ -255,10 +235,6 @@ compileBranch branch = do
     case result of
         Right (_, finalState) -> return $ csBuilder finalState
         Left err -> throwError $ "Error in branch compilation: " ++ err
-
--- =============================================================================
--- TOP-LEVEL COMPILER FUNCTION
--- =============================================================================
 
 isMainFunc :: Ast -> Bool
 isMainFunc (Define "main" (Lambda {})) = True
