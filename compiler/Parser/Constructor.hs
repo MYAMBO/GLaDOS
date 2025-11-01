@@ -34,13 +34,13 @@ handleDefine :: String -> [String] -> Env -> Env
 handleDefine line ls env =
   case toEither (runParser astDefine line) of
     Right ast -> parseAllLines ls (env ++ [ast])
-    Left _    -> traceError "Syntax error in 'define' statement" line env
+    Left _    -> traceError "Syntax error in 'define' statement" line []
 
 handleFunc :: String -> [String] -> Env -> Env
 handleFunc line ls env =
   case toEither (runParser astConstructor line) of
     Right ast -> parseAllLines ls (env ++ [ast])
-    Left _    -> traceError "Syntax error in 'func' statement" line env
+    Left _    -> traceError "Syntax error in 'func' statement" line []
 
 handleBody :: String -> [String] -> Env -> Env
 handleBody line ls env =
@@ -51,7 +51,7 @@ handleBody line ls env =
         case fillBody env (removeSpaces funcName) bodyLines of
           Left err -> trace ("\n---\n[!] " ++ err ++ "\n---") []
           Right updatedEnv -> parseAllLines remainingLines updatedEnv
-    Nothing -> traceError "Error: Failed to parse function body header" line env
+    Nothing -> traceError "Error: Failed to parse function body header" line []
 
 handleUnknown :: String -> Env
 handleUnknown line =
