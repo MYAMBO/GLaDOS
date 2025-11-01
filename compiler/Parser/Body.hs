@@ -87,19 +87,28 @@ parseFunctionCall env localArgs s =
   let (name, rest) = span isAlphaNum s
       trimmedRest = trimLine rest
   in
-    if null name || null trimmedRest then
-      Left $ "Invalid function call syntax for: \"" ++ s ++ "\""
-    else
-      case uncons trimmedRest of
-        Just ('(', middleAndLast) ->
-          case unsnoc middleAndLast of
-            Just (middle, ')') -> do
-              argsAst <- parseExpression env localArgs middle
-              return $ Call (Symbol name) [argsAst]
-            _ -> Left $ "Syntax error: Unterminated parenthesis in function call \"" ++ s ++ "\""
-        _ -> do
-          argsAsts <- traverse (parseExpression env localArgs) (words trimmedRest)
-          return $ Call (Symbol name) argsAsts
+    if null name then
+      Left "Invalid function call: missing function name."
+      argStrings <- splitArgsBody trimmedRest
+      argAsts <- traverse (parseExpression env localArgs) argStrings
+      Right $ Call (Symbol name) argAsts
+
+parenthesesHandle :: String -> Int -> String -> [String] -> Either String [String]
+parenthesesHandle [] 0 "" acc = Right $ reverse acc
+parenthesesHandle [] 0 current acc = Right $ reverse (trimLine current : acc)
+parenthesesHandle [] level _ _ = Left $ "Syntax error: Unbalanced opening parentheses. Level: " ++ show level
+parenthesesHandle (c:cs) level current acc
+    | level < 0 = Left "Syntax error: Unbalanced closing parentheses."
+    | c == '(' = parenthesesHandle cs (level + 1) (current ++ [c]) acc
+    | c == ')' = parenthesesHandle cs (level - 1) (current ++ [c]) acc
+    | c == ' ' && level == 0 =
+        if null (trimLine current)
+        then parenthesesHandle cs 0 "" acc
+        else parenthesesHandle cs 0 "" (trimLine current : acc)
+    | otherwise = parenthesesHandle cs level (current ++ [c]) acc
+
+splitArgsBody :: String -> Either String [String]
+splitArgsBody s = parenthesesHandle (trimLine s) 0 "" []
 
 parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
 parseFactor env localArgs s =
