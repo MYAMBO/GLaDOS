@@ -37,5 +37,5 @@ astDefine = do
         value <- parseAnyCharExcept "\n"
         let cleanValue = removeSpaces value
         if null cleanValue
-          then return $ trace ("No value assigned to variable: " ++ varName) $ Define varName (Var (String "error") varName)
+          then return $ Define varName (Var (String "error") varName)
           else return $ Define varName (Var (addValueToVar (astFindType varType) cleanValue) varName)

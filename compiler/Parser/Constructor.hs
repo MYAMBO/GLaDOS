@@ -39,7 +39,7 @@ handleDefine :: String -> [String] -> Env -> Env
 handleDefine line ls env =
   case toEither (runParser astDefine line) of
     Right ast -> parseAllLines ls (env ++ [ast])
-    Left _    -> traceError "Syntax error in 'define' statement" line env
+    Left _    -> traceError "Syntax error in 'define' statement" line []
 
 handleFunc :: String -> [String] -> Env -> Env
 handleFunc line ls env =
