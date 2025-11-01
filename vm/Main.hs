@@ -12,7 +12,6 @@ import BytecodeParser (parseBytecode)
 import VmExec (exec)
 import Op (Val(..))
 
--- Custom function to display only the value without the type constructor
 showValue :: Val -> String
 showValue (Int8Val v) = show v
 showValue (Int16Val v) = show v

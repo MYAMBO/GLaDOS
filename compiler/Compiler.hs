@@ -130,10 +130,9 @@ compileGlobalDefine name ast = do
 compileTransformedOp :: Ast -> Ast -> Builtins -> Builtins -> Compiler ()
 compileTransformedOp argA argB innerOp outerOp = do
     emitBuiltinOp outerOp
-    compileAst (BinOp innerOp [argA, argB]) False  -- Always False for internal op calls
+    compileAst (BinOp innerOp [argA, argB]) False
     emitInstruction "Call" (emitI32 1)
 
--- Add context for tail calls
 type TailContext = Bool
 type TailAstCompiler = Ast -> TailContext -> Compiler ()
 
@@ -152,8 +151,8 @@ compileAst (Symbol name) _ = do
             else throwError $ "Undefined variable: '" ++ name ++ "'"
 
 compileAst (Call func argsAst) inTailContext = do
-    compileAst func False  -- Function name is never in tail position
-    mapM_ (\arg -> compileAst arg False) argsAst  -- Arguments are never in tail position
+    compileAst func False
+    mapM_ (\arg -> compileAst arg False) argsAst
     if inTailContext
         then emitInstruction "TailCall" (emitI32 (length argsAst))
         else emitInstruction "Call" (emitI32 (length argsAst))
@@ -170,13 +169,13 @@ compileAst (BinOp op args) inTailContext = do
             GreaterThanOrEqual -> compileTransformedOp (head argNodes) (argNodes !! 1) LessThan Not
             _ -> do
                 emitBuiltinOp op
-                mapM_ (\arg -> compileAst arg False) argNodes  -- Arguments are never in tail position
+                mapM_ (\arg -> compileAst arg False) argNodes
                 if inTailContext
                     then emitInstruction "TailCall" (emitI32 requiredArity)
                     else emitInstruction "Call" (emitI32 requiredArity)
 
 compileAst (If cond thenBranch elseBranch) inTailContext = do
-    compileAst cond False  -- Condition is never in tail position
+    compileAst cond False
     thenBuilder <- compileBranch thenBranch inTailContext
     let thenSize = fromIntegral $ BL.length $ BB.toLazyByteString thenBuilder
     elseBuilder <- compileBranch elseBranch inTailContext
@@ -193,7 +192,7 @@ compileAst (LiteralList _ elements) inTailContext = do
     where
       compileListElement element = do
         emitBuiltinOp Cons
-        compileAst element False  -- List elements are never in tail position
+        compileAst element False
         emitInstruction "Call" (emitI32 2)
 
 compileAst (List []) _ = return ()
@@ -209,7 +208,7 @@ compileAst (List statements) inTailContext = do
     compileStatements (stmt:rest) inTailContext = do
         case stmt of
             Define varName varValueAst -> do
-                compileAst varValueAst False  -- Definition values are never in tail position
+                compileAst varValueAst False
                 modify $ \s -> s { csLocalScope = Set.insert varName (csLocalScope s) }
                 emitInstruction "Define" (emitString varName)
             _ -> do
@@ -228,11 +227,10 @@ compileLambda args body = do
     let argMap = Map.fromList $ zip argNames [0..]
     let lambdaLocalScope = foldr Set.insert (csLocalScope currentState) argNames
     let tempState = currentState {
-        csBuilder = mempty,              -- Fresh bytecode builder for this function
-        csGlobalEnvBuilder = mempty,     -- Don't carry over global env builder
-        csLocalScope = lambdaLocalScope, -- New scope with function's args
-        csArgScope = argMap              -- Map of argument names to indices
-        -- Global entry count and other global state preserved
+        csBuilder = mempty,
+        csGlobalEnvBuilder = mempty,
+        csLocalScope = lambdaLocalScope,
+        csArgScope = argMap
     }
     let bodyCompiler = compileAst body True >> (findOpcode "Return" opcodes "instruction" >>= emitB)
     result <- lift $ lift $ runCompiler bodyCompiler tempState
@@ -244,7 +242,6 @@ compileLambda args body = do
 compileBranch :: Ast -> Bool -> Compiler BB.Builder
 compileBranch branch inTailContext = do
     currentState <- get
-    -- Create temp state preserving global environment info but with fresh builders for this branch
     let tempState = currentState {
         csBuilder = mempty,
         csGlobalEnvBuilder = mempty
