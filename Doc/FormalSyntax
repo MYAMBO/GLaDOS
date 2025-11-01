@@ -1,3 +1,5 @@
+This documentation is a formal syntax of the language. It is written in BNF format.
+
 <program> ::= <declaration-list>
 
 <declaration-list> ::= <declaration> | <declaration-list> <declaration>
@@ -20,7 +22,7 @@
 
 <digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 
-<function-definition> ::= "$" <identifier> <NEWLINE> <statement-list>
+<function-definition> ::= "$" <identifier> <NEWLINE> <statement-list> <NEWLINE> "->" <expression>
 
 <function-call> ::= <identifier> "(" <expression> { "," <expression> } ")"
 
