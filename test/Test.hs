@@ -9,10 +9,12 @@ import Text.Printf
 
 import TestParsing (tests)
 import TestLinesToAst (testslinesToAst)
+import TestCompilation (testCompilation)
 
 main :: IO ()
 main = defaultMainWithIngredients [antXMLRunner, consoleTestReporter, listingTests] $
-  testGroup "Paring Library Tests"
+  testGroup "GLaDOS Tests"
     [ tests,
-      testslinesToAst
+      testslinesToAst,
+      testCompilation
     ]
