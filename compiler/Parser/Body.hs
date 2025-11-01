@@ -97,6 +97,7 @@ parseFunctionCall env localArgs s =
   in
     if null name then
       Left "Invalid function call: missing function name."
+    else do
       argStrings <- splitArgsBody trimmedRest
       argAsts <- traverse (parseExpression env localArgs) argStrings
       Right $ Call (Symbol name) argAsts
