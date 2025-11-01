@@ -97,26 +97,26 @@ parseFunctionCall env localArgs s =
   in
     if null name then
       Left "Invalid function call: missing function name."
-    else do
-      let argStrings = splitArgsBody trimmedRest
+      argStrings <- splitArgsBody trimmedRest
       argAsts <- traverse (parseExpression env localArgs) argStrings
       Right $ Call (Symbol name) argAsts
 
-chooseSplit :: String -> Int -> String -> [String] -> [String]
-chooseSplit [] _ "" acc = reverse acc
-chooseSplit [] _ current acc = reverse (trimLine current : acc)
-chooseSplit (c:cs) level current acc
-  | c == '(' = chooseSplit cs (level + 1) (current ++ [c]) acc
-  | c == ')' = chooseSplit cs (level - 1) (current ++ [c]) acc
-  | c == ' ' && level == 0 =
-    if null (trimLine current)
-      then chooseSplit cs 0 "" acc
-      else chooseSplit cs 0 "" (trimLine current : acc)
-  | otherwise = chooseSplit cs level (current ++ [c]) acc
+parenthesesHandle :: String -> Int -> String -> [String] -> Either String [String]
+parenthesesHandle [] 0 "" acc = Right $ reverse acc
+parenthesesHandle [] 0 current acc = Right $ reverse (trimLine current : acc)
+parenthesesHandle [] level _ _ = Left $ "Syntax error: Unbalanced opening parentheses. Level: " ++ show level
+parenthesesHandle (c:cs) level current acc
+    | level < 0 = Left "Syntax error: Unbalanced closing parentheses."
+    | c == '(' = parenthesesHandle cs (level + 1) (current ++ [c]) acc
+    | c == ')' = parenthesesHandle cs (level - 1) (current ++ [c]) acc
+    | c == ' ' && level == 0 =
+        if null (trimLine current)
+        then parenthesesHandle cs 0 "" acc
+        else parenthesesHandle cs 0 "" (trimLine current : acc)
+    | otherwise = parenthesesHandle cs level (current ++ [c]) acc
 
-
-splitArgsBody :: String -> [String]
-splitArgsBody s = chooseSplit (trimLine s) 0 "" []
+splitArgsBody :: String -> Either String [String]
+splitArgsBody s = parenthesesHandle (trimLine s) 0 "" []
 
 parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
 parseFactor env localArgs s =
