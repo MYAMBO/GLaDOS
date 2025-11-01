@@ -171,8 +171,8 @@ hex2 w =
 ------------------------------------------------------------
 
 data Lit = Lit
-  { lty   :: String   -- e.g. "Int32", "Bool", ...
-  , lshow :: String   -- e.g. "5"
+  { lty   :: String
+  , lshow :: String
   } deriving (Eq, Show)
 
 data Expr
@@ -184,8 +184,8 @@ data Expr
   deriving (Eq, Show)
 
 data Param = Param
-  { pType :: Maybe String  -- e.g. Just "Int32"
-  , pName :: String        -- e.g. "a0"
+  { pType :: Maybe String
+  , pName :: String
   } deriving (Eq, Show)
 
 data Top
@@ -268,7 +268,6 @@ inferExprType e =
       TyUnknown
 
     ECall _ args ->
-      -- heuristic: result "looks like" the dominant arg type
       foldr mergeTy TyUnknown (map inferExprType args)
 
     EBin o xs ->
@@ -290,7 +289,6 @@ inferReturnTypeName body =
     TyNamed t -> Just t
     TyUnknown -> Nothing
 
--- For local inference: if (a0 + a1) is Int32, we learn a0:Int32, a1:Int32.
 inferVarTypes :: Expr -> M.Map String Ty
 inferVarTypes e = go e
   where
@@ -326,7 +324,6 @@ inferVarTypes e = go e
 -- Utilities for building/annotating functions
 ------------------------------------------------------------
 
--- orderedVars: first-seen var names in expression
 orderedVars :: Expr -> [String]
 orderedVars = go []
   where
@@ -341,8 +338,6 @@ orderedVars = go []
     go seen (EIf c t e) =
       go (go (go seen c) t) e
 
--- Build a raw TFunc with param names but not param types yet.
--- We pick param names by scanning body vars and taking the first `argc`.
 buildFuncTop :: String -> Int -> Expr -> Top
 buildFuncTop fname argc bodyExpr =
   let varsInBody  = orderedVars bodyExpr
@@ -361,14 +356,8 @@ buildFuncTop fname argc bodyExpr =
 
 ------------------------------------------------------------
 -- Cross-function inference
---
--- We look at calls like `adder 4 5`. From that we learn:
---   - param0 of adder is Int32
---   - param1 of adder is Int32
---   - call result is Int32, so adder returns Int32
 ------------------------------------------------------------
 
--- collectCalls e = [(calleeName, [argExpr])]
 collectCalls :: Expr -> [(String, [Expr])]
 collectCalls e =
   case e of
@@ -386,7 +375,6 @@ collectCalls e =
     EVar _ ->
       []
 
--- Map fnName -> Map paramIndex Ty (from callsites)
 collectParamHints :: [Top] -> M.Map String (M.Map Int Ty)
 collectParamHints tops =
   let allCalls = concatMap callsFromTop tops
@@ -405,7 +393,6 @@ collectParamHints tops =
     callsFromTop (TExpr e)          = collectCalls e
     callsFromTop _                  = []
 
--- Map fnName -> Ty (the return type hinted by where it's used)
 collectReturnHints :: [Top] -> M.Map String Ty
 collectReturnHints tops =
   let allFullCalls = concatMap callsFromTop tops
@@ -417,7 +404,6 @@ collectReturnHints tops =
     callsFromTop (TExpr e)          = callsInExpr e
     callsFromTop _                  = []
 
-    -- callsInExpr returns (calleeName, [args], callTy)
     callsInExpr :: Expr -> [(String,[Expr],Ty)]
     callsInExpr ex =
       case ex of
@@ -434,19 +420,15 @@ collectReturnHints tops =
         ELit _ -> []
         EVar _ -> []
 
--- annotateProgramTypes:
---   - fill in param types for each TFunc using local + cross-call info
---   - fill in missing return types using cross-call info
 annotateProgramTypes :: [Top] -> [Top]
 annotateProgramTypes tops0 =
   let
-    paramHints  = collectParamHints tops0     -- Map fnName -> Map ix Ty
-    retHints    = collectReturnHints tops0    -- Map fnName -> Ty
+    paramHints  = collectParamHints tops0
+    retHints    = collectReturnHints tops0
 
     annotateOne :: Top -> Top
     annotateOne tf@(TFunc nm params retTy body) =
       let
-        -- local inference of vars inside body
         localVarMap :: M.Map String Ty
         localVarMap = inferVarTypes body
 
@@ -536,12 +518,10 @@ parseEnvValAsTop name c0 = do
           pure (Just fnTop, c2)
 
       | t == tagOp -> do
-          -- builtin operator in env, not a user func def
           (_, c2) <- getU8 c1
           pure (Nothing, c2)
 
       | otherwise -> do
-          -- env const / global value (we ignore for now)
           c2 <- skipAfterTag t c1
           pure (Nothing, c2)
 
@@ -1123,7 +1103,7 @@ render = go 0 . normalize
     bSym _   = "<?>"
 
 ------------------------------------------------------------
--- Public API
+-- Global Managing Section
 ------------------------------------------------------------
 
 decompileToString :: BL.ByteString -> Either String String
@@ -1142,7 +1122,6 @@ decompileToString bs = do
               len  = BL.length code
           (tops, _) <- deTop (Cur code (off c3)) len
 
-          -- cross-function inference step:
           let annotated = annotateProgramTypes (envTops ++ tops)
 
           pure (renderProgram annotated)
