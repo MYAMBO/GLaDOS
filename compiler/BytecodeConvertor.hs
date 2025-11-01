@@ -105,20 +105,12 @@ bytecodeToBool = (/= 0) . BL.head
 
 --------------- Char / Bytecode -----------------------------------------------
 
--- Encode a Char as 1-byte ByteString
 charToBytecode :: Char -> BB.Builder
 charToBytecode c = BB.word8 (fromIntegral (ord c))
 
--- Decode a 1-byte ByteString back to Char
 bytecodeToChar :: BL.ByteString -> Char
 bytecodeToChar bs
     | BL.length bs /= 1 = error "ByteString must be exactly 1 byte"
     | otherwise =
         let byte = BL.head bs
         in chr (fromIntegral byte)
-
--- Encode a String as ByteString (optional)
--- stringToBytecode :: String -> BL.ByteString
--- stringToBytecode str =
---     let builder = mconcat (map charToBytecode str)
---     in BB.toLazyByteString builder

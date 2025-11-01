@@ -7,8 +7,12 @@ import Test.Tasty.Ingredients.Basic
 import System.IO
 import Text.Printf
 
+import TestParsing (tests)
+import TestLinesToAst (testslinesToAst)
+
 main :: IO ()
 main = defaultMainWithIngredients [antXMLRunner, consoleTestReporter, listingTests] $
-  testGroup "Tests"
-    [
+  testGroup "Paring Library Tests"
+    [ tests,
+      testslinesToAst
     ]
