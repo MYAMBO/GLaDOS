@@ -54,10 +54,14 @@ buildIfChain env localArgs ((cond, thenL):restIfs) finalElse = do
     Right $ If condAst thenAst elseAst
 
 buildBodyAsts :: [Ast] -> [Ast] -> [String] -> ParseResult
-buildBodyAsts env localArgs rLines =
-    let (ifBlocks, elseBlock) = splitIfElseBlocks rLines
-    in if null ifBlocks && null elseBlock then Left "Function body cannot be empty."
-       else buildIfChain env localArgs ifBlocks elseBlock
+buildBodyAsts env localArgs rawLines =
+    let (ifBlocks, elseBlock) = splitIfElseBlocks rawLines
+    in
+      if not (null ifBlocks) && null elseBlock
+      then Left "Syntax error: A conditional function body must end with a mandatory 'else' (->) clause."
+      else if null ifBlocks && null elseBlock
+      then Left "Function body cannot be empty or contain only whitespace."
+      else buildIfChain env localArgs ifBlocks elseBlock
 
 fillBody :: [Ast] -> String -> [String] -> Either String [Ast]
 fillBody env funcName rawLines =

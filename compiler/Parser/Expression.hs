@@ -67,7 +67,14 @@ parseSymbol :: String -> ParseResult
 parseSymbol s = Right $ Symbol s
 
 parseAtom :: [Ast] -> [Ast] -> String -> ParseResult
-parseAtom _ _ s = fromMaybe (parseSymbol s) (parseCharLiteral s <|> parseNumericOrBool s)
+parseAtom env localArgs s =
+  case parseCharLiteral s <|> parseNumericOrBool s of
+    Just result -> result
+    Nothing ->
+      if isDefinedFunc env s then
+        Right $ Call (Symbol s) []
+      else
+        Right $ Symbol s
 
 splitArgsGo :: Int -> String -> [String] -> String -> Either String [String]
 splitArgsGo 0 "" acc "" = Right $ reverse acc
@@ -100,18 +107,23 @@ parseFunctionCall env localArgs s =
 
 parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
 parseFactor env localArgs s =
-  let trimmed = trimLine s
-      (pName, pRest) = span isIdentifierChar trimmed
-  in if "-" `isPrefixOf` trimmed then 
-        (do op <- parseFactor env localArgs (drop 1 trimmed); Right $ BinOp Neg [op])
-     else if "!" `isPrefixOf` trimmed then 
-        (do op <- parseFactor env localArgs (drop 1 trimmed); Right $ BinOp Not [op])
-     else if not (null trimmed) && head trimmed == '(' && last trimmed == ')' then 
-        parseExpression env localArgs (init (tail trimmed))
-     else if not (null pName) && not (null (trimLine pRest)) then 
-        parseFunctionCall env localArgs trimmed
-     else 
-        parseAtom env localArgs trimmed
+  let trimmed = trimLine s in
+  if "-" `isPrefixOf` trimmed then
+    do operand <- parseFactor env localArgs (drop 1 trimmed); Right $ BinOp Neg [operand]
+  else if "!" `isPrefixOf` trimmed then
+    do operand <- parseFactor env localArgs (drop 1 trimmed); Right $ BinOp Not [operand]
+  else if not (null trimmed) && head trimmed == '(' && last trimmed == ')' then
+    parseExpression env localArgs (init (tail trimmed))
+  else
+    case parseNumericOrBool trimmed of
+      Just (Right ast) -> Right ast
+      Just (Left err) -> Left err
+      Nothing ->
+        let (potentialName, nameRest) = span isIdentifierChar trimmed
+        in if not (null potentialName) && not (null (trimLine nameRest)) then
+             parseFunctionCall env localArgs trimmed
+           else
+             parseAtom env localArgs trimmed
 
 parseTerm :: [Ast] -> [Ast] -> String -> ParseResult
 parseTerm env localArgs s =
