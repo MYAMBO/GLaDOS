@@ -1,0 +1,84 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Sliece",
+	"patterns": [
+		{
+			"name": "comment.block.sliece",
+			"begin": "/\\*",
+			"end": "\\*/"
+		},
+		{
+ 			"name": "comment.line.double-slash.sliece",
+			"match": "//.*$"
+		},
+		{
+ 			"name": "keyword.declaration.sliece",
+			"match": "\\b(func|define)\\b"
+		},
+		{
+			"name": "meta.generic",
+			"begin": "<",
+			"end": ">(?!=)",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.generic.begin.sliece" }
+			},
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.generic.end.sliece" }
+			},
+			"patterns": [
+				{
+					"name": "entity.name.type",
+					"match": "[A-Za-z_][A-Za-z0-9_]*"
+				}
+			]
+		},
+		{
+			"name": "meta.operator.arrow.sliece",
+			"match": "=>|->"
+		},
+		{
+			"name": "keyword.operator",
+			"match": "(==|<|>|\\+|-|\\*|/)"
+		},
+		{
+			"name": "variable.other",
+			"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+		},
+		{
+ 			"name": "entity.name.function.sliece",
+			"match": "\\$\\s*[a-zA-Z_][a-zA-Z0-9_]*"
+		},
+		{
+ 			"name": "constant.character.sliece",
+			"match": "'[^']'"
+		},
+		{
+ 			"name": "constant.numeric.sliece",
+			"match": "\\b[0-9]+\\b"
+		},
+		{
+ 			"name": "storage.type.sliece",
+			"match": "\\b(Int8|Int16|Int32|Int64|Float32|Float64|Bool|Char|String|Void)\\b"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.sliece",
+				"match": "\\b(if|while|for|return)\\b"
+			}]
+		},
+		"strings": {
+			"name": "string.quoted.double.sliece",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.sliece",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.sliece"
+}
