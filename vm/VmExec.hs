@@ -1,3 +1,5 @@
+-- vm/VmExec.hs
+
 {-
 -- EPITECH PROJECT, 2025
 -- GLaDOS
@@ -157,22 +159,24 @@ applyBinaryOp intOp fltOp dblOp v1 v2 stack
             _ -> Left $ "Error: Type mismatch. Cannot operate on " ++ show v1 ++ " and " ++ show v2
 
 execOp :: Op -> Stack -> Either String Stack
-execOp Add (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a + b)) (\a b -> FltVal (a + b)) (\a b -> DblVal (a + b)) v2 v1 stack
-execOp Mul (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a * b)) (\a b -> FltVal (a * b)) (\a b -> DblVal (a * b)) v2 v1 stack
-execOp Eq (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) v2 v1 stack
-
-execOp Sub (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a - b)) (\a b -> FltVal (a - b)) (\a b -> DblVal (a - b)) v2 v1 stack
-execOp Lt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) v2 v1 stack
-execOp Gt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) v2 v1 stack
+-- --- NUMERIC OPERATIONS ---
+execOp Add (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a + b)) (\a b -> FltVal (a + b)) (\a b -> DblVal (a + b)) v1 v2 stack
+execOp Sub (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a - b)) (\a b -> FltVal (a - b)) (\a b -> DblVal (a - b)) v1 v2 stack
+execOp Mul (v2:v1:stack) = applyBinaryOp (\a b -> Int64Val (a * b)) (\a b -> FltVal (a * b)) (\a b -> DblVal (a * b)) v1 v2 stack
 
 execOp Div (v2:v1:stack) =
-    case (valToDouble v2, valToDouble v1) of
-        (Just d2, Just d1) | d1 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ DblVal (d2 / d1) : stack
-        _ -> case (valToFloat v2, valToFloat v1) of
-            (Just f2, Just f1) | f1 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ FltVal (f2 / f1) : stack
-            _ -> case (valToInt64 v2, valToInt64 v1) of
-                (Just i2, Just i1) | i1 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ Int64Val (i2 `div` i1) : stack
-                _ -> Left $ "Error: Type mismatch for division on " ++ show v2 ++ " and " ++ show v1
+    case (valToDouble v1, valToDouble v2) of
+        (Just d1, Just d2) | d2 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ DblVal (d1 / d2) : stack
+        _ -> case (valToFloat v1, valToFloat v2) of
+            (Just f1, Just f2) | f2 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ FltVal (f1 / f2) : stack
+            _ -> case (valToInt64 v1, valToInt64 v2) of
+                (Just i1, Just i2) | i2 == 0 -> Left "Error: Division by zero" | otherwise -> Right $ Int64Val (i1 `div` i2) : stack
+                _ -> Left $ "Error: Type mismatch for division on " ++ show v1 ++ " and " ++ show v2
+
+execOp Mod (v2:v1:stack) =
+    case (valToInt64 v1, valToInt64 v2) of
+        (Just i1, Just i2) | i2 == 0 -> Left "Error: Modulo by zero" | otherwise -> Right $ Int64Val (i1 `mod` i2) : stack
+        _ -> Left $ "Error: Modulo requires integer types. Got " ++ show v1 ++ " and " ++ show v2
 
 execOp Neg (v:stack) = case v of
     Int8Val n -> Right $ Int8Val (negate n) : stack; Int16Val n -> Right $ Int16Val (negate n) : stack
@@ -181,10 +185,17 @@ execOp Neg (v:stack) = case v of
     DblVal n -> Right $ DblVal (negate n) : stack
     _ -> Left $ "Error: Negation not supported for value: " ++ show v
 
+execOp Eq (BoolVal b:BoolVal a:stack) = Right $ BoolVal (a == b) : stack -- Boolean case
+execOp Eq (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) (\a b -> BoolVal (a == b)) v1 v2 stack
+
+execOp Lt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) (\a b -> BoolVal (a < b)) v1 v2 stack
+execOp Gt (v2:v1:stack) = applyBinaryOp (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) (\a b -> BoolVal (a > b)) v1 v2 stack
+
 execOp Not (BoolVal a : stack) = return $ BoolVal (not a) : stack
 execOp And (BoolVal b : BoolVal a : stack) = return $ BoolVal (a && b) : stack
 execOp Or (BoolVal b : BoolVal a : stack) = return $ BoolVal (a || b) : stack
 execOp Xor (BoolVal b : BoolVal a : stack) = return $ BoolVal (a /= b) : stack
+
 execOp Cons (v : List vs : stack) = return $ List (v:vs) : stack
 execOp Car (List (v:_) : stack) = return $ v : stack
 execOp Car (List [] : _) = Left "Error: Car cannot be called on an empty list"
