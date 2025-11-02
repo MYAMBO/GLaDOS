@@ -403,7 +403,7 @@ readTagValue tag c =
   case tag of
     t | t == tagBool -> do
           (b, c1) <- getU8 c
-          let s = if b == 0 then "false" else "true"
+          let s = if b == 0 then "False" else "True"
           pure (lit "Bool" s, c1)
 
       | t == tagI8 -> do
@@ -553,7 +553,7 @@ deExpr c0 lim = go c0 0 emptyEst
                   case tag of
                     _ | tag == tagBool -> do
                           (b, c3) <- getU8 c2
-                          let s = if b == 0 then "false" else "true"
+                          let s = if b == 0 then "False" else "True"
                           go c3 (bump 3 used)
                              (pushE (SV (lit "Bool" s)) est)
 
@@ -760,7 +760,7 @@ deTop c0 lim = go c0 0 emptyT
                   case tag of
                     _ | tag == tagBool -> do
                           (b, c3) <- getU8 c2
-                          let s = if b == 0 then "false" else "true"
+                          let s = if b == 0 then "False" else "True"
                           go c3 (bump 3 used)
                              (pushT (SV (lit "Bool" s)) st)
 
