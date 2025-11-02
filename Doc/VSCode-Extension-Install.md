@@ -7,7 +7,7 @@ To package and install it, open a terminal in that folder and run the following 
 ```bash
 cd vsCodeExtension/sliece
 vsce package
-code --install-extension vscode-lielang-0.0.1.vsix
+code --install-extension sliece-0.0.1.vsix
 ```
 
 Notes:
