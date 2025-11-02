@@ -36,18 +36,13 @@ main = do
         if null astList
         then putStrLn "Parsing failed or produced no output. Aborting compilation."
         else do
-            putStrLn "--- Compiling Files with New Function Structure ---"
-            mapM_ print astList
-            putStrLn "--------------------------------------------------------"
-
             compilationResult <- compile astList
-
             case compilationResult of
                 Left compileError -> do
-                    putStrLn "\n❌ Compilation Failed:"
+                    putStrLn "❌ Compilation Failed:"
                     putStrLn compileError
                 Right bytecode -> do
                     let outputFilename = "out.cake"
-                    putStrLn $ "\n✅ Compilation Successful!"
+                    putStrLn $ "✅ Compilation Successful!"
                     BL.writeFile outputFilename bytecode
                     putStrLn $ "Bytecode written to '" ++ outputFilename ++ "'"
