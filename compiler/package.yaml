@@ -23,6 +23,9 @@ library:
   - Parser.Parse
   - Parsing
   - DataTypes
+  - Parser.Utils
+  - Parser.Expression
+  - Parser.Statement
 
 executables:
   glados-compiler:

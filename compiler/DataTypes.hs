@@ -62,15 +62,19 @@ parseLiteral (String _) _ = Nothing
 astFindOperation :: String -> Builtins
 astFindOperation "=="   = Equal
 astFindOperation "!="   = NotEqual
-astFindOperation "<"    = LessThan
-astFindOperation ">"    = GreaterThan
 astFindOperation "<="   = LessThanOrEqual
 astFindOperation ">="   = GreaterThanOrEqual
+astFindOperation "<"    = LessThan
+astFindOperation ">"    = GreaterThan
 astFindOperation "+"    = Add
 astFindOperation "-"    = Subtract
 astFindOperation "*"    = Multiply
 astFindOperation "/"    = Divide
 astFindOperation "%"    = Modulo
+astFindOperation "&&"   = And
+astFindOperation "!"    = Not
+astFindOperation "||"   = Or
+astFindOperation "xor"    = Xor
 astFindOperation _      = UnknownOp
 
 removeSpaces :: String -> String
