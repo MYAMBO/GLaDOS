@@ -26,7 +26,7 @@ import Unsafe.Coerce (unsafeCoerce)
 ------------------------------------------------------------
 
 magicNumber, currentVersion :: Word32
-magicNumber    = 0x42414B41 -- "BAKA"
+magicNumber    = 0x42414B41
 currentVersion = 2
 
 opcPush, opcPop, opcReturn, opcJump, opcJumpIfFalse, opcCall,
@@ -170,8 +170,8 @@ hex2 w =
 ------------------------------------------------------------
 
 data Lit = Lit
-  { lty   :: String   -- e.g. "Int32", "Bool"
-  , lshow :: String   -- e.g. "5", "false"
+  { lty   :: String
+  , lshow :: String
   } deriving (Eq, Show)
 
 data Expr
@@ -183,13 +183,12 @@ data Expr
   deriving (Eq, Show)
 
 data Param = Param
-  { pType :: Maybe String  -- e.g. Just "Int32"
-  , pName :: String        -- e.g. "a"
+  { pType :: Maybe String
+  , pName :: String
   } deriving (Eq, Show)
 
 data Top
   = TVar (Maybe String) String Expr
-    -- define <type?> <name> = <expr>
   | TFunc
       { fnName   :: String
       , fnParams :: [Param]
@@ -291,28 +290,16 @@ inferReturnTypeName body =
 
 ------------------------------------------------------------
 -- Parameter type inference (NEW LOGIC)
---
--- Goal:
---   Look at how each parameter is *used with literals*.
---   If param is compared or combined arithmetically with an Int32 literal,
---   we infer Int32 for that param.
---
---   We IGNORE "Bool-ness" of comparisons. Instead we look at the other side.
 ------------------------------------------------------------
 
--- Extract literal type name if this Expr is a literal.
 litTypeOf :: Expr -> Maybe String
 litTypeOf (ELit (Lit t _)) = Just t
 litTypeOf _                = Nothing
 
--- Does this expression look exactly like a variable with a given name?
 isVarNamed :: String -> Expr -> Bool
 isVarNamed nm (EVar v) = v == nm
 isVarNamed _  _        = False
 
--- Collect all candidate type hints for a given param name in an Expr.
--- We walk the tree and whenever we see (param OP literal) or (literal OP param)
--- where OP is arithmetic or comparison, we record that literal's type.
 inferParamHints :: String -> Expr -> [String]
 inferParamHints pname expr =
   case expr of
@@ -328,25 +315,20 @@ inferParamHints pname expr =
       ++ inferParamHints pname t
       ++ inferParamHints pname e'
 
-    -- unary or binary or n-ary operator
     EBin o xs ->
       let sub = concatMap (inferParamHints pname) xs
       in sub ++ pairHints o xs
   where
-    -- look at interesting operator uses
     pairHints :: Op -> [Expr] -> [String]
     pairHints o xs
-      -- unary like Neg [x]
       | [x] <- xs
       , isArith o
       = case () of
-          _ | isVarNamed pname x -> []  -- no literal to match here
+          _ | isVarNamed pname x -> []
             | otherwise          -> []
-      -- binary case
       | [x,y] <- xs
       , isArith o || isComparison o
       = hintFromPair x y
-      -- more than 2 operands: check consecutive pairs
       | (x1:x2:rest) <- xs
       , isArith o || isComparison o
       = hintFromPair x1 x2 ++ pairHints o (x2:rest)
@@ -354,22 +336,15 @@ inferParamHints pname expr =
 
     hintFromPair :: Expr -> Expr -> [String]
     hintFromPair a b
-      -- param OP literal
       | isVarNamed pname a
       , Just t <- litTypeOf b
       = [t]
-      -- literal OP param
       | isVarNamed pname b
       , Just t <- litTypeOf a
       = [t]
       | otherwise
       = []
 
--- Pick a final type name for this param:
---  - gather all hints
---  - deduplicate
---  - if exactly one unique candidate, use it
---  - else Nothing
 inferParamTypeName :: String -> Expr -> Maybe String
 inferParamTypeName pname body =
   case L.nub (inferParamHints pname body) of
@@ -383,7 +358,6 @@ inferParamTypeName pname body =
 buildFuncTop :: String -> Int -> Expr -> Top
 buildFuncTop fname argc bodyExpr =
   let
-    -- Collect distinct var names in stable first-seen order
     orderedVars :: Expr -> [String]
     orderedVars ex = goVars ex []
       where
@@ -487,16 +461,11 @@ readTagValue tag c =
       | otherwise ->
           Left ("Unknown env tag: 0x" ++ hex2 tag)
 
--- read the bytes of a tagFunc body
 readFuncValBody :: Cur -> Either String (BL.ByteString, Cur)
 readFuncValBody c0 = do
   (n, c1) <- getI32BE c0
   takeN (fromIntegral n) c1
 
--- Turn one env entry into maybe a Top
--- - tagFunc → TFunc
--- - literal → TVar
--- - tagOp   → ignored as standalone top
 parseEnvValAsTop :: String -> Cur -> Either String (Maybe Top, Cur)
 parseEnvValAsTop name c0 = do
   (tag, c1) <- getU8 c0
@@ -510,12 +479,10 @@ parseEnvValAsTop name c0 = do
           pure (Just fnTop, c2)
 
       | t == tagOp -> do
-          -- builtin op exported in env; not rendered as user code
           (_, c2) <- getU8 c1
           pure (Nothing, c2)
 
       | otherwise -> do
-          -- global const / define
           (valExpr, c2) <- readTagValue t c1
           let tyGuess = inferTypeFromLit valExpr
           pure (Just (TVar tyGuess name valExpr), c2)
@@ -893,7 +860,6 @@ deTop c0 lim = go c0 0 emptyT
                   ((nm, nB), c2) <- getString c1
                   case tstk st of
                     (SF bs : rest) -> do
-                      -- function def at top level
                       let cur = Cur bs 0
                           len = BL.length bs
                       (bodyExpr, argc, _) <- deExpr cur len
@@ -901,7 +867,6 @@ deTop c0 lim = go c0 0 emptyT
                       go c2 (bump (1 + 4 + nB) used)
                          (emit fnTop st { tstk = rest })
                     _ -> do
-                      -- const / variable def at top level
                       (rhs, st1) <- popExprT st
                       go c2 (bump (1 + 4 + nB) used)
                          (emit (TVar (inferTypeFromLit rhs) nm rhs) st1)
@@ -973,7 +938,6 @@ renderProgram tops =
   . L.intercalate "\n\n"
   $ map renderTop ordered
   where
-    -- order: defines first, then funcs, then loose expressions
     ordered =
       [ t | t@TVar{}  <- tops ]
       ++ [ t | t@TFunc{} <- tops ]
@@ -1025,28 +989,23 @@ render = go 0 . normalize
     go _ (EVar s)         = s
     go _ (EBin _ [])      = "<?>"
 
-    -- unary op
     go p (EBin o [a]) =
       par (p > 7) $ uSym o ++ atom a
 
-    -- binary op
     go p (EBin o [a,b]) =
       par (p > prec o) $
         go (prec o) a ++ " " ++ bSym o ++ " " ++ go (prec o) b
 
-    -- 3+ operands (rare)
     go p (EBin o xs@(_ : _ : _ : _)) =
       let k      = prec o
           parts  = map (go (k + 1)) xs
       in par (p > k) (L.intercalate (" " ++ bSym o ++ " ") parts)
 
-    -- calls
     go _ (ECall f []) = go 9 f
     go p (ECall f as) =
       par (p > 8) $
         L.intercalate " " (go 8 f : map arg as)
 
-    -- inline if
     go p (EIf c t e) =
       par (p > 0) $
         "if " ++ go 0 c ++ " then " ++ go 0 t ++ " else " ++ go 0 e
