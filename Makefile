@@ -9,11 +9,11 @@ STACK = stack
 TEST_DIR = test
 COVERAGE_DIR = $(TEST_DIR)/coverage
 
-all:    build_vm build_compiler
+all:    build_vm build_compiler build_decompiler
 
-clean:    clean_vm clean_compiler
+clean:    clean_vm clean_compiler clean_decompiler
 
-fclean:    clean fclean_vm fclean_compiler
+fclean:    clean fclean_vm fclean_compiler fclean_decompiler
 
 tests_run:
 	@$(STACK) clean
@@ -61,3 +61,21 @@ fclean_compiler:
 
 re_compiler:
 	@$(MAKE) -C $(COMPILER_DIR) re
+
+DECOMPILER_DIR = decompiler
+DECOMPILER_OUTPUT = glados-decompiler
+
+decompiler:
+	@$(MAKE) -C $(DECOMPILER_DIR) all
+
+build_decompiler:
+	@$(MAKE) -C $(DECOMPILER_DIR) $(DECOMPILER_OUTPUT)
+
+clean_decompiler:
+	@$(MAKE) -C $(DECOMPILER_DIR) clean
+
+fclean_decompiler:
+	@$(MAKE) -C $(DECOMPILER_DIR) fclean
+
+re_decompiler:
+	@$(MAKE) -C $(DECOMPILER_DIR) re
