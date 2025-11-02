@@ -15,5 +15,3 @@ This extension adds syntax highlighting for the Sliece programming language.
 
 1. Open any `.lie` file in VS Code.
 2. Enjoy syntax highlighting for Sliece!
-
-Made by [Your Name].
