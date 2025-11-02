@@ -1,0 +1,40 @@
+{
+  "name": "sliece",
+  "displayName": "sliece",
+  "description": "a sliece extension",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.105.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "sliece",
+      "aliases": ["Sliece", "sliece"],
+      "extensions": [".lie"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "sliece",
+      "scopeName": "source.sliece",
+      "path": "./syntaxes/sliece.tmLanguage.json"
+    }]
+    ,
+    "tokenColors": [
+      {
+        "scope": "meta.operator.arrow.sliece",
+        "settings": { "foreground": "#D4D4D4" }
+      },
+      {
+        "scope": "punctuation.definition.generic.begin.sliece",
+        "settings": { "foreground": "#D4D4D4" }
+      },
+      {
+        "scope": "punctuation.definition.generic.end.sliece",
+        "settings": { "foreground": "#D4D4D4" }
+      }
+    ]
+  }
+}
