@@ -75,7 +75,6 @@ astFindOperation "&&"   = And
 astFindOperation "!"    = Not
 astFindOperation "||"   = Or
 astFindOperation "^"    = Xor
-astFindOperation "-"  = Neg
 astFindOperation _      = UnknownOp
 
 removeSpaces :: String -> String
