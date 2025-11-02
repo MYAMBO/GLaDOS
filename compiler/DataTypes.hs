@@ -74,7 +74,7 @@ astFindOperation "%"    = Modulo
 astFindOperation "&&"   = And
 astFindOperation "!"    = Not
 astFindOperation "||"   = Or
-astFindOperation "^"    = Xor
+astFindOperation "xor"    = Xor
 astFindOperation _      = UnknownOp
 
 removeSpaces :: String -> String
