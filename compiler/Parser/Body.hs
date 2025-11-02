@@ -11,12 +11,15 @@ import Parsing
 import DataTypes
 import Parser.Tools
 import Text.Read (readMaybe)
-import Data.Char (isAlphaNum, ord)
+import Data.Char (isAlphaNum, ord, isDigit, isSpace)
 import Control.Applicative ((<|>))
 import Data.Maybe (isJust, fromMaybe)
 import Data.List (find, isPrefixOf, uncons, unsnoc)
 
 type ParseResult = Either String Ast
+
+isIdentifierChar :: Char -> Bool
+isIdentifierChar c = isAlphaNum c || c == '_'
 
 parseBodyHeader :: Parser String
 parseBodyHeader = do
@@ -73,9 +76,7 @@ parseSymbolOrCall :: [Ast] -> [Ast] -> String -> ParseResult
 parseSymbolOrCall env localArgs s
     | ' ' `elem` s || '(' `elem` s = parseFunctionCall env localArgs s
     | isDefinedFunc env s          = Right $ Call (Symbol s) []
-    | isLocalArg localArgs s       = Right $ Symbol s
-    | isGlobalVar env s            = Right $ Symbol s
-    | otherwise                    = Left $ "Error: Use of undeclared function or variable '" ++ s ++ "'"
+    | otherwise                    = Right $ Symbol s
 
 parseAtom :: [Ast] -> [Ast] -> String -> ParseResult
 parseAtom env localArgs s =
@@ -84,32 +85,33 @@ parseAtom env localArgs s =
 
 parseFunctionCall :: [Ast] -> [Ast] -> String -> ParseResult
 parseFunctionCall env localArgs s =
-  let (name, rest) = span isAlphaNum s
+  let (name, rest) = span isIdentifierChar s
       trimmedRest = trimLine rest
   in
     if null name then
       Left "Invalid function call: missing function name."
-    else do
-      argStrings <- splitArgsBody trimmedRest
-      argAsts <- traverse (parseExpression env localArgs) argStrings
-      Right $ Call (Symbol name) argAsts
-
-parenthesesHandle :: String -> Int -> String -> [String] -> Either String [String]
-parenthesesHandle [] 0 "" acc = Right $ reverse acc
-parenthesesHandle [] 0 current acc = Right $ reverse (trimLine current : acc)
-parenthesesHandle [] level _ _ = Left $ "Syntax error: Unbalanced opening parentheses. Level: " ++ show level
-parenthesesHandle (c:cs) level current acc
-    | level < 0 = Left "Syntax error: Unbalanced closing parentheses."
-    | c == '(' = parenthesesHandle cs (level + 1) (current ++ [c]) acc
-    | c == ')' = parenthesesHandle cs (level - 1) (current ++ [c]) acc
-    | c == ' ' && level == 0 =
-        if null (trimLine current)
-        then parenthesesHandle cs 0 "" acc
-        else parenthesesHandle cs 0 "" (trimLine current : acc)
-    | otherwise = parenthesesHandle cs level (current ++ [c]) acc
+    else
+        argStrings <- splitArgsBody trimmedRest
+        argAsts <- traverse (parseExpression env localArgs) argStrings
+        Right $ Call (Symbol name) argAsts
 
 splitArgsBody :: String -> Either String [String]
-splitArgsBody s = parenthesesHandle (trimLine s) 0 "" []
+splitArgsBody s = go (trimLine s) 0 "" []
+  where
+    go :: String -> Int -> String -> [String] -> Either String [String]
+    go [] 0 "" acc = Right $ reverse acc
+    go [] 0 current acc = Right $ reverse (trimLine current : acc)
+    go [] level _ _ = Left $ "Syntax error: Unbalanced opening parentheses in function call. Level: " ++ show level
+
+    go (c:cs) level current acc
+        | level < 0 = Left "Syntax error: Unbalanced closing parentheses in function call."
+        | c == '(' = go cs (level + 1) (current ++ [c]) acc
+        | c == ')' = go cs (level - 1) (current ++ [c]) acc
+        | c == ' ' && level == 0 =
+            if null (trimLine current)
+            then go cs 0 "" acc
+            else go cs 0 "" (trimLine current : acc)
+        | otherwise = go cs level (current ++ [c]) acc
 
 parseFactor :: [Ast] -> [Ast] -> String -> ParseResult
 parseFactor env localArgs s =
@@ -117,25 +119,41 @@ parseFactor env localArgs s =
   in case uncons trimmed of
        Just ('(', rest) ->
          case unsnoc rest of
-           Just (middle, ')') -> parseExpression env localArgs middle
+           Just (middle, ')') -> parseOrOp env localArgs middle
            _ -> Left $ "Syntax error: Unterminated parenthesis in expression \"" ++ trimmed ++ "\""
        _ -> parseAtom env localArgs trimmed
+
+parseUnary :: [Ast] -> [Ast] -> String -> ParseResult
+parseUnary env localArgs s =
+  let trimmed = trimLine s
+  in
+    if "-" `isPrefixOf` trimmed && not (isDigit (head (dropWhile isSpace (drop 1 trimmed)))) then
+      let rest = drop 1 trimmed
+      in do
+        operand <- parseUnary env localArgs rest
+        Right $ BinOp Neg [operand]
+    else if "!" `isPrefixOf` trimmed then
+      let rest = drop 1 trimmed
+      in do
+        operand <- parseUnary env localArgs rest
+        Right $ BinOp Not [operand]
+    else parseFactor env localArgs trimmed
 
 parseTerm :: [Ast] -> [Ast] -> String -> ParseResult
 parseTerm env localArgs s =
   case findLastOp s ["*", "/", "%"] of
     Just (op, left, right) -> do
       leftAst <- parseTerm env localArgs left
-      rightAst <- parseFactor env localArgs right
+      rightAst <- parseUnary env localArgs right
       Right $ BinOp (astFindOperation op) [leftAst, rightAst]
-    Nothing -> parseFactor env localArgs s
+    Nothing -> parseUnary env localArgs s
 
 parseAddition :: [Ast] -> [Ast] -> String -> ParseResult
 parseAddition env localArgs s =
   case findLastOp s ["+", "-"] of
     Just (op, left, right) ->
       if op == "-" && null (trimLine left)
-      then parseAtom env localArgs s
+      then parseUnary env localArgs s
       else do
         leftAst <- parseAddition env localArgs left
         rightAst <- parseTerm env localArgs right
@@ -144,19 +162,37 @@ parseAddition env localArgs s =
 
 parseComparison :: [Ast] -> [Ast] -> String -> ParseResult
 parseComparison env localArgs s =
-  case findLastOp s ["==", "!=", "<", ">", "<=", ">="] of
+  case findLastOp s ["==", "!=", "<=", ">=", "<", ">"] of
     Just (op, left, right) -> do
       leftAst <- parseComparison env localArgs left
       rightAst <- parseAddition env localArgs right
       Right $ BinOp (astFindOperation op) [leftAst, rightAst]
     Nothing -> parseAddition env localArgs s
 
+parseAndOp :: [Ast] -> [Ast] -> String -> ParseResult
+parseAndOp env localArgs s =
+  case findLastOp s ["&&"] of
+    Just (op, left, right) -> do
+      leftAst <- parseAndOp env localArgs left
+      rightAst <- parseComparison env localArgs right
+      Right $ BinOp (astFindOperation op) [leftAst, rightAst]
+    Nothing -> parseComparison env localArgs s
+
+parseOrOp :: [Ast] -> [Ast] -> String -> ParseResult
+parseOrOp env localArgs s =
+  case findLastOp s ["||"] of
+    Just (op, left, right) -> do
+      leftAst <- parseOrOp env localArgs left
+      rightAst <- parseAndOp env localArgs right
+      Right $ BinOp (astFindOperation op) [leftAst, rightAst]
+    Nothing -> parseAndOp env localArgs s
+
 parseExpression :: [Ast] -> [Ast] -> String -> ParseResult
 parseExpression env localArgs s =
     let trimmed = trimLine s
     in if null trimmed
        then Left "Cannot parse an empty expression."
-       else parseComparison env localArgs trimmed
+       else parseOrOp env localArgs trimmed
 
 splitIfElseBlocks :: [String] -> ([(String, [String])], [String])
 splitIfElseBlocks [] = ([], [])
@@ -174,8 +210,8 @@ splitIfElseBlocks (l:ls) =
                 else
                     let (nextIfs, finalElse) = splitIfElseBlocks remainingLs
                     in ((conditionPart, thisThenBlock) : nextIfs, finalElse)
-        
         Nothing -> ([], l:ls)
+
 breakOnArrow :: String -> Maybe (String, String)
 breakOnArrow s = case breakOn "->" s of (pre, "->", post) -> Just (trimLine pre, trimLine post); _ -> Nothing
 
