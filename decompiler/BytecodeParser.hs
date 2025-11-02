@@ -14,7 +14,6 @@ module Decompiler
 
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.List as L
-import qualified Data.Map.Strict as M
 
 import Data.Bits ((.|.), shiftL)
 import Data.Int  (Int8, Int16, Int32, Int64)
@@ -171,8 +170,8 @@ hex2 w =
 ------------------------------------------------------------
 
 data Lit = Lit
-  { lty   :: String
-  , lshow :: String
+  { lty   :: String   -- e.g. "Int32", "Bool"
+  , lshow :: String   -- e.g. "5", "false"
   } deriving (Eq, Show)
 
 data Expr
@@ -184,12 +183,13 @@ data Expr
   deriving (Eq, Show)
 
 data Param = Param
-  { pType :: Maybe String
-  , pName :: String
+  { pType :: Maybe String  -- e.g. Just "Int32"
+  , pName :: String        -- e.g. "a"
   } deriving (Eq, Show)
 
 data Top
   = TVar (Maybe String) String Expr
+    -- define <type?> <name> = <expr>
   | TFunc
       { fnName   :: String
       , fnParams :: [Param]
@@ -207,7 +207,7 @@ inferTypeFromLit (ELit (Lit t _)) = Just t
 inferTypeFromLit _                = Nothing
 
 ------------------------------------------------------------
--- Normalize small patterns (like !(a==b) → a!=b)
+-- Normalize expression (simplify !x == etc.)
 ------------------------------------------------------------
 
 normalize :: Expr -> Expr
@@ -223,7 +223,7 @@ normalize (ECall f as) = ECall (normalize f) (map normalize as)
 normalize x            = x
 
 ------------------------------------------------------------
--- Generic type inference
+-- Return type inference (what does the function return?)
 ------------------------------------------------------------
 
 data Ty
@@ -289,222 +289,214 @@ inferReturnTypeName body =
     TyNamed t -> Just t
     TyUnknown -> Nothing
 
-inferVarTypes :: Expr -> M.Map String Ty
-inferVarTypes e = go e
-  where
-    tagChild :: Expr -> Ty -> M.Map String Ty
-    tagChild (EVar v) (TyNamed t) = M.singleton v (TyNamed t)
-    tagChild _        _           = M.empty
-
-    go :: Expr -> M.Map String Ty
-    go expr =
-      case expr of
-        EVar _ -> M.empty
-        ELit _ -> M.empty
-
-        EBin _ xs ->
-          let hereTy = inferExprType expr
-              direct = mconcat [ tagChild x hereTy | x <- xs ]
-              recs   = mconcat (map go xs)
-          in M.unionWith mergeTy direct recs
-
-        ECall f xs ->
-          let hereTy = inferExprType expr
-              direct = mconcat [ tagChild a hereTy | a <- xs ]
-              recs   = go f `M.union` mconcat (map go xs)
-          in M.unionWith mergeTy direct recs
-
-        EIf c t e' ->
-          let rc = go c
-              rt = go t
-              re = go e'
-          in M.unionsWith mergeTy [rc, rt, re]
-
 ------------------------------------------------------------
--- Utilities for building/annotating functions
+-- Parameter type inference (NEW LOGIC)
+--
+-- Goal:
+--   Look at how each parameter is *used with literals*.
+--   If param is compared or combined arithmetically with an Int32 literal,
+--   we infer Int32 for that param.
+--
+--   We IGNORE "Bool-ness" of comparisons. Instead we look at the other side.
 ------------------------------------------------------------
 
-orderedVars :: Expr -> [String]
-orderedVars = go []
+-- Extract literal type name if this Expr is a literal.
+litTypeOf :: Expr -> Maybe String
+litTypeOf (ELit (Lit t _)) = Just t
+litTypeOf _                = Nothing
+
+-- Does this expression look exactly like a variable with a given name?
+isVarNamed :: String -> Expr -> Bool
+isVarNamed nm (EVar v) = v == nm
+isVarNamed _  _        = False
+
+-- Collect all candidate type hints for a given param name in an Expr.
+-- We walk the tree and whenever we see (param OP literal) or (literal OP param)
+-- where OP is arithmetic or comparison, we record that literal's type.
+inferParamHints :: String -> Expr -> [String]
+inferParamHints pname expr =
+  case expr of
+    EVar _ -> []
+    ELit _ -> []
+
+    ECall f xs ->
+      inferParamHints pname f
+      ++ concatMap (inferParamHints pname) xs
+
+    EIf c t e' ->
+      inferParamHints pname c
+      ++ inferParamHints pname t
+      ++ inferParamHints pname e'
+
+    -- unary or binary or n-ary operator
+    EBin o xs ->
+      let sub = concatMap (inferParamHints pname) xs
+      in sub ++ pairHints o xs
   where
-    go seen (EVar v)
-      | v `elem` seen = seen
-      | otherwise     = seen ++ [v]
-    go seen (ELit _)  = seen
-    go seen (ECall f xs) =
-      foldl go (go seen f) xs
-    go seen (EBin _ xs) =
-      foldl go seen xs
-    go seen (EIf c t e) =
-      go (go (go seen c) t) e
+    -- look at interesting operator uses
+    pairHints :: Op -> [Expr] -> [String]
+    pairHints o xs
+      -- unary like Neg [x]
+      | [x] <- xs
+      , isArith o
+      = case () of
+          _ | isVarNamed pname x -> []  -- no literal to match here
+            | otherwise          -> []
+      -- binary case
+      | [x,y] <- xs
+      , isArith o || isComparison o
+      = hintFromPair x y
+      -- more than 2 operands: check consecutive pairs
+      | (x1:x2:rest) <- xs
+      , isArith o || isComparison o
+      = hintFromPair x1 x2 ++ pairHints o (x2:rest)
+      | otherwise = []
+
+    hintFromPair :: Expr -> Expr -> [String]
+    hintFromPair a b
+      -- param OP literal
+      | isVarNamed pname a
+      , Just t <- litTypeOf b
+      = [t]
+      -- literal OP param
+      | isVarNamed pname b
+      , Just t <- litTypeOf a
+      = [t]
+      | otherwise
+      = []
+
+-- Pick a final type name for this param:
+--  - gather all hints
+--  - deduplicate
+--  - if exactly one unique candidate, use it
+--  - else Nothing
+inferParamTypeName :: String -> Expr -> Maybe String
+inferParamTypeName pname body =
+  case L.nub (inferParamHints pname body) of
+    [t] -> Just t
+    _   -> Nothing
+
+------------------------------------------------------------
+-- Build function Top after decoding
+------------------------------------------------------------
 
 buildFuncTop :: String -> Int -> Expr -> Top
 buildFuncTop fname argc bodyExpr =
-  let varsInBody  = orderedVars bodyExpr
-      headerNames = take argc varsInBody
-      paramsNoType =
-        [ Param { pType = Nothing, pName = nm }
-        | nm <- headerNames
-        ]
-      retTy = inferReturnTypeName bodyExpr
-  in TFunc
-        { fnName   = fname
-        , fnParams = paramsNoType
-        , fnRet    = retTy
-        , fnBody   = bodyExpr
-        }
-
-------------------------------------------------------------
--- Cross-function inference
-------------------------------------------------------------
-
-collectCalls :: Expr -> [(String, [Expr])]
-collectCalls e =
-  case e of
-    ECall (EVar fname) args ->
-      (fname, args)
-      : concatMap collectCalls args
-    ECall f args ->
-      collectCalls f ++ concatMap collectCalls args
-    EBin _ xs ->
-      concatMap collectCalls xs
-    EIf c t f ->
-      collectCalls c ++ collectCalls t ++ collectCalls f
-    ELit _ ->
-      []
-    EVar _ ->
-      []
-
-collectParamHints :: [Top] -> M.Map String (M.Map Int Ty)
-collectParamHints tops =
-  let allCalls = concatMap callsFromTop tops
-      step acc (fname, args) =
-        let argTys = map inferExprType args
-            mergeOne m (ix,ty) =
-              M.insertWith mergeTy ix ty m
-        in M.insertWith
-              (M.unionWith mergeTy)
-              fname
-              (foldl mergeOne M.empty (zip [0..] argTys))
-              acc
-  in foldl step M.empty allCalls
-  where
-    callsFromTop (TFunc _ _ _ body) = collectCalls body
-    callsFromTop (TExpr e)          = collectCalls e
-    callsFromTop _                  = []
-
-collectReturnHints :: [Top] -> M.Map String Ty
-collectReturnHints tops =
-  let allFullCalls = concatMap callsFromTop tops
-      step acc (fname, _args, fullCallTy) =
-        M.insertWith mergeTy fname fullCallTy acc
-  in foldl step M.empty allFullCalls
-  where
-    callsFromTop (TFunc _ _ _ body) = callsInExpr body
-    callsFromTop (TExpr e)          = callsInExpr e
-    callsFromTop _                  = []
-
-    callsInExpr :: Expr -> [(String,[Expr],Ty)]
-    callsInExpr ex =
-      case ex of
-        ECall (EVar fname) args ->
-          let callTy = inferExprType ex
-          in (fname, args, callTy)
-             : concatMap callsInExpr args
-        ECall f args ->
-          callsInExpr f ++ concatMap callsInExpr args
-        EBin _ xs ->
-          concatMap callsInExpr xs
-        EIf c t f ->
-          callsInExpr c ++ callsInExpr t ++ callsInExpr f
-        ELit _ -> []
-        EVar _ -> []
-
-annotateProgramTypes :: [Top] -> [Top]
-annotateProgramTypes tops0 =
   let
-    paramHints  = collectParamHints tops0
-    retHints    = collectReturnHints tops0
+    -- Collect distinct var names in stable first-seen order
+    orderedVars :: Expr -> [String]
+    orderedVars ex = goVars ex []
+      where
+        goVars (EVar v) seen
+          | v `elem` seen = seen
+          | otherwise     = seen ++ [v]
+        goVars (ELit _)    seen = seen
+        goVars (ECall f as) seen =
+          foldl (\s a -> goVars a s) (goVars f seen) as
+        goVars (EBin _ xs) seen =
+          foldl (\s a -> goVars a s) seen xs
+        goVars (EIf c t e) seen =
+          goVars e (goVars t (goVars c seen))
 
-    annotateOne :: Top -> Top
-    annotateOne tf@(TFunc nm params retTy body) =
-      let
-        localVarMap :: M.Map String Ty
-        localVarMap = inferVarTypes body
+    headerParamNames :: [String]
+    headerParamNames = take argc (orderedVars bodyExpr)
 
-        thisFnParamHints :: M.Map Int Ty
-        thisFnParamHints =
-          case M.lookup nm paramHints of
-            Just m  -> m
-            Nothing -> M.empty
+    finalParams :: [Param]
+    finalParams =
+      [ Param
+          { pName = pname
+          , pType = inferParamTypeName pname bodyExpr
+          }
+      | pname <- headerParamNames
+      ]
 
-        inferParamType :: Int -> Param -> Maybe String
-        inferParamType ix (Param _ pname) =
-          let fromCall = M.findWithDefault TyUnknown ix thisFnParamHints
-              fromBody = M.findWithDefault TyUnknown pname localVarMap
-              merged   = mergeTy fromCall fromBody
-          in case merged of
-              TyNamed t -> Just t
-              TyUnknown -> Nothing
+    retTy = inferReturnTypeName bodyExpr
 
-        newParams :: [Param]
-        newParams =
-          [ Param { pName = pName p
-                  , pType = inferParamType ix p
-                  }
-          | (ix,p) <- zip [0..] params
-          ]
-
-        newRet :: Maybe String
-        newRet =
-          case retTy of
-            Just t  -> Just t
-            Nothing ->
-              case M.lookup nm retHints of
-                Just (TyNamed t) -> Just t
-                _                -> Nothing
-
-      in tf { fnParams = newParams
-            , fnRet    = newRet
-            }
-
-    annotateOne other = other
-
-  in map annotateOne tops0
+  in
+    TFunc
+      { fnName   = fname
+      , fnParams = finalParams
+      , fnRet    = retTy
+      , fnBody   = bodyExpr
+      }
 
 ------------------------------------------------------------
--- Tagged values / byte-count helpers
+-- Helpers for parsing tagged literal values from env
 ------------------------------------------------------------
 
-skipAfterTag :: Word8 -> Cur -> Either String Cur
-skipAfterTag tag c = case tag of
-  t | t == tagBool -> snd <$> getU8 c
-    | t == tagOp   -> snd <$> getU8 c
-    | t == tagFunc -> do
-          (n, c1) <- getI32BE c
-          (_, c2) <- takeN (fromIntegral n) c1
-          pure c2
-    | t == tagI8   -> snd <$> getU8 c
-    | t == tagI16  -> snd <$> getU16BE c
-    | t == tagI32  -> snd <$> getU32BE c
-    | t == tagI64  -> snd <$> getU64BE c
-    | t == tagW8   -> snd <$> getU8 c
-    | t == tagW16  -> snd <$> getU16BE c
-    | t == tagW32  -> snd <$> getU32BE c
-    | t == tagW64  -> snd <$> getU64BE c
-    | t == tagFlt  -> snd <$> getU32BE c
-    | t == tagDbl  -> snd <$> getU64BE c
-    | otherwise    -> Left ("Unknown value tag: 0x" ++ hex2 tag)
+readTagValue :: Word8 -> Cur -> Either String (Expr, Cur)
+readTagValue tag c =
+  case tag of
+    t | t == tagBool -> do
+          (b, c1) <- getU8 c
+          let s = if b == 0 then "false" else "true"
+          pure (lit "Bool" s, c1)
 
+      | t == tagI8 -> do
+          (w, c1) <- getU8 c
+          let i = fromIntegral (fromIntegral w :: Int8)
+              s = if i >= 32 && i <= 126 && isPrint (chr i)
+                    then ['\'', chr i, '\'']
+                    else show i
+          pure (lit "Int8" s, c1)
+
+      | t == tagI16 -> do
+          (i, c1) <- getI16BE c
+          pure (lit "Int16" (show i), c1)
+
+      | t == tagI32 -> do
+          (i, c1) <- getI32BE c
+          pure (lit "Int32" (show i), c1)
+
+      | t == tagI64 -> do
+          (i, c1) <- getI64BE c
+          pure (lit "Int64" (show i), c1)
+
+      | t == tagW8 -> do
+          (w, c1) <- getU8 c
+          pure (lit "UInt8" (show w), c1)
+
+      | t == tagW16 -> do
+          (w, c1) <- getU16BE c
+          pure (lit "UInt16" (show w), c1)
+
+      | t == tagW32 -> do
+          (w, c1) <- getU32BE c
+          pure (lit "UInt32" (show w), c1)
+
+      | t == tagW64 -> do
+          (w, c1) <- getU64BE c
+          pure (lit "UInt64" (show w), c1)
+
+      | t == tagFlt -> do
+          (w, c1) <- getU32BE c
+          pure (lit "Float" (show (word32ToFloat w)), c1)
+
+      | t == tagDbl -> do
+          (w, c1) <- getU64BE c
+          pure (lit "Double" (show (word64ToDouble w)), c1)
+
+      | t == tagOp -> do
+          (b, c1) <- getU8 c
+          o <- opFromByte b
+          pure (EVar ("/*op " ++ show o ++ "*/"), c1)
+
+      | t == tagFunc ->
+          Left "readTagValue: got tagFunc where literal expected"
+
+      | otherwise ->
+          Left ("Unknown env tag: 0x" ++ hex2 tag)
+
+-- read the bytes of a tagFunc body
 readFuncValBody :: Cur -> Either String (BL.ByteString, Cur)
 readFuncValBody c0 = do
   (n, c1) <- getI32BE c0
   takeN (fromIntegral n) c1
 
-------------------------------------------------------------
--- Parse environment (v2 stores top-level funcs here)
-------------------------------------------------------------
-
+-- Turn one env entry into maybe a Top
+-- - tagFunc → TFunc
+-- - literal → TVar
+-- - tagOp   → ignored as standalone top
 parseEnvValAsTop :: String -> Cur -> Either String (Maybe Top, Cur)
 parseEnvValAsTop name c0 = do
   (tag, c1) <- getU8 c0
@@ -518,12 +510,15 @@ parseEnvValAsTop name c0 = do
           pure (Just fnTop, c2)
 
       | t == tagOp -> do
+          -- builtin op exported in env; not rendered as user code
           (_, c2) <- getU8 c1
           pure (Nothing, c2)
 
       | otherwise -> do
-          c2 <- skipAfterTag t c1
-          pure (Nothing, c2)
+          -- global const / define
+          (valExpr, c2) <- readTagValue t c1
+          let tyGuess = inferTypeFromLit valExpr
+          pure (Just (TVar tyGuess name valExpr), c2)
 
 parseEnv :: Cur -> Either String ([Top], Cur)
 parseEnv c0 = do
@@ -537,7 +532,7 @@ parseEnv c0 = do
   loop count [] c1
 
 ------------------------------------------------------------
--- Expression decoder
+-- Expression decoder (for function bodies / blocks)
 ------------------------------------------------------------
 
 data SI = SV Expr | SOP Op | SF BL.ByteString
@@ -591,9 +586,9 @@ deExpr c0 lim = go c0 0 emptyEst
                   case tag of
                     _ | tag == tagBool -> do
                           (b, c3) <- getU8 c2
+                          let s = if b == 0 then "false" else "true"
                           go c3 (bump 3 used)
-                             (pushE (SV (lit "Bool"
-                                   (if b == 0 then "false" else "true"))) est)
+                             (pushE (SV (lit "Bool" s)) est)
 
                       | tag == tagOp -> do
                           (b, c3) <- getU8 c2
@@ -749,7 +744,7 @@ deExpr c0 lim = go c0 0 emptyEst
       pure (a : xs, e2)
 
 ------------------------------------------------------------
--- Top-level decoder
+-- Top-level decoder (final code section after env)
 ------------------------------------------------------------
 
 data Tst = Tst
@@ -798,9 +793,9 @@ deTop c0 lim = go c0 0 emptyT
                   case tag of
                     _ | tag == tagBool -> do
                           (b, c3) <- getU8 c2
+                          let s = if b == 0 then "false" else "true"
                           go c3 (bump 3 used)
-                             (pushT (SV (lit "Bool"
-                                   (if b == 0 then "false" else "true"))) st)
+                             (pushT (SV (lit "Bool" s)) st)
 
                       | tag == tagOp -> do
                           (b, c3) <- getU8 c2
@@ -898,6 +893,7 @@ deTop c0 lim = go c0 0 emptyT
                   ((nm, nB), c2) <- getString c1
                   case tstk st of
                     (SF bs : rest) -> do
+                      -- function def at top level
                       let cur = Cur bs 0
                           len = BL.length bs
                       (bodyExpr, argc, _) <- deExpr cur len
@@ -905,6 +901,7 @@ deTop c0 lim = go c0 0 emptyT
                       go c2 (bump (1 + 4 + nB) used)
                          (emit fnTop st { tstk = rest })
                     _ -> do
+                      -- const / variable def at top level
                       (rhs, st1) <- popExprT st
                       go c2 (bump (1 + 4 + nB) used)
                          (emit (TVar (inferTypeFromLit rhs) nm rhs) st1)
@@ -972,18 +969,21 @@ deTop c0 lim = go c0 0 emptyT
 
 renderProgram :: [Top] -> String
 renderProgram tops =
-  (++ "\n") . L.intercalate "\n\n" $ map renderTop ordered
+  (++ "\n")
+  . L.intercalate "\n\n"
+  $ map renderTop ordered
   where
+    -- order: defines first, then funcs, then loose expressions
     ordered =
-      [ t | t@TFunc{} <- tops ] ++
-      [ t | t@TVar{}  <- tops ] ++
-      [ t | t@TExpr{} <- tops ]
+      [ t | t@TVar{}  <- tops ]
+      ++ [ t | t@TFunc{} <- tops ]
+      ++ [ t | t@TExpr{} <- tops ]
 
 renderTop :: Top -> String
-renderTop (TVar (Just ty) n e) =
-  "define " ++ ty ++ " " ++ n ++ " = " ++ render e
-renderTop (TVar Nothing  n e)  =
-  "define " ++ n  ++ " = " ++ render e
+renderTop (TVar mty n e) =
+  case mty of
+    Just ty -> "define " ++ ty ++ " " ++ n ++ " = " ++ render e
+    Nothing -> "define " ++ n  ++ " = " ++ render e
 
 renderTop (TFunc nm params ret body) =
     "func " ++ nm ++ "<" ++ renderParams params ++ "> => " ++ renderRet ret
@@ -1034,19 +1034,19 @@ render = go 0 . normalize
       par (p > prec o) $
         go (prec o) a ++ " " ++ bSym o ++ " " ++ go (prec o) b
 
-    -- fallback for weird multi-arg ops
+    -- 3+ operands (rare)
     go p (EBin o xs@(_ : _ : _ : _)) =
       let k      = prec o
-          pieces = map (go (k + 1)) xs
-      in par (p > k) (L.intercalate (" " ++ bSym o ++ " ") pieces)
+          parts  = map (go (k + 1)) xs
+      in par (p > k) (L.intercalate (" " ++ bSym o ++ " ") parts)
 
-    -- f x y z
+    -- calls
     go _ (ECall f []) = go 9 f
     go p (ECall f as) =
       par (p > 8) $
         L.intercalate " " (go 8 f : map arg as)
 
-    -- if/then/else inline
+    -- inline if
     go p (EIf c t e) =
       par (p > 0) $
         "if " ++ go 0 c ++ " then " ++ go 0 t ++ " else " ++ go 0 e
@@ -1103,7 +1103,7 @@ render = go 0 . normalize
     bSym _   = "<?>"
 
 ------------------------------------------------------------
--- Global Managing Section
+-- Public API
 ------------------------------------------------------------
 
 decompileToString :: BL.ByteString -> Either String String
@@ -1121,10 +1121,7 @@ decompileToString bs = do
           let code = input c3
               len  = BL.length code
           (tops, _) <- deTop (Cur code (off c3)) len
-
-          let annotated = annotateProgramTypes (envTops ++ tops)
-
-          pure (renderProgram annotated)
+          pure (renderProgram (envTops ++ tops))
 
 writeDecompiled :: FilePath -> FilePath -> IO (Either String ())
 writeDecompiled inp out = do
